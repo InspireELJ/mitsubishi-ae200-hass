@@ -1,0 +1,6 @@
+# Home Assistant add-on repository metadata.
+# Lets users add this GitHub repo as an add-on store and install the
+# "Mitsubishi AE-200" add-on found under ./addon.
+name: Mitsubishi AE-200 Add-ons
+url: "https://github.com/GitDakky/mitsubishi-ae200-hass"
+maintainer: GitDakky

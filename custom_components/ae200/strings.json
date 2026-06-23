@@ -1,0 +1,47 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mitsubishi AE-200 / EW-50",
+        "description": "Enter the IP address of your AE-200, AE-50, EW-50 or compatible centralised controller. The controller must be reachable on your network.",
+        "data": {
+          "host": "Host / IP address",
+          "port": "Port",
+          "prefer_websocket": "Prefer websocket (gives zone names; recommended for AE-200/EW-50)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the controller. Check the IP address and that the controller's web interface is reachable.",
+      "no_groups": "Connected, but no air-conditioning groups were found on the controller."
+    },
+    "abort": {
+      "already_configured": "This controller is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AE-200 options",
+        "data": {
+          "scan_interval": "Polling interval (seconds, minimum 15)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "inlet_temp": { "name": "Return air temperature" },
+      "outdoor_temp": { "name": "Outdoor temperature" },
+      "humidity": { "name": "Humidity" },
+      "water_outlet_temp": { "name": "Water outlet temperature" }
+    },
+    "binary_sensor": {
+      "filter_sign": { "name": "Filter cleaning required" },
+      "error_sign": { "name": "Fault" }
+    },
+    "switch": {
+      "remote_lock": { "name": "Local remote lockout" }
+    }
+  }
+}

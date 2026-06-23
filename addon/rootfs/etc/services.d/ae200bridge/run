@@ -1,0 +1,43 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Mitsubishi AE-200 add-on: start the bridge service.
+# Reads add-on options + the auto-discovered MQTT service, then execs the
+# Python bridge. s6 supervises and restarts it (with the add-on watchdog) if
+# it ever exits.
+# ==============================================================================
+
+bashio::log.info "Preparing Mitsubishi AE-200 bridge..."
+
+AE200_HOST="$(bashio::config 'ae200_host')"
+if bashio::var.is_empty "${AE200_HOST}"; then
+    bashio::log.fatal "ae200_host is not set. Configure the controller IP in the add-on options."
+    exit 1
+fi
+
+export AE200_HOST
+export AE200_PORT="$(bashio::config 'ae200_port')"
+export AE200_PREFER_WS="$(bashio::config 'prefer_websocket')"
+export AE200_SCAN_INTERVAL="$(bashio::config 'scan_interval')"
+export LOG_LEVEL="$(bashio::string.upper "$(bashio::config 'log_level')")"
+
+# --- MQTT: manual override, else the auto-discovered service ------------------
+if bashio::config.has_value 'mqtt_host'; then
+    export MQTT_HOST="$(bashio::config 'mqtt_host')"
+    export MQTT_PORT="$(bashio::config 'mqtt_port')"
+    export MQTT_USER="$(bashio::config 'mqtt_username')"
+    export MQTT_PASSWORD="$(bashio::config 'mqtt_password')"
+    bashio::log.info "Using manually configured MQTT broker at ${MQTT_HOST}:${MQTT_PORT}"
+elif bashio::services.available 'mqtt'; then
+    export MQTT_HOST="$(bashio::services 'mqtt' 'host')"
+    export MQTT_PORT="$(bashio::services 'mqtt' 'port')"
+    export MQTT_USER="$(bashio::services 'mqtt' 'username')"
+    export MQTT_PASSWORD="$(bashio::services 'mqtt' 'password')"
+    bashio::log.info "Using auto-discovered MQTT broker at ${MQTT_HOST}:${MQTT_PORT}"
+else
+    bashio::log.fatal "No MQTT service available. Install/configure the Mosquitto add-on or set mqtt_host."
+    exit 1
+fi
+
+bashio::log.info "Starting bridge for AE-200 at ${AE200_HOST}:${AE200_PORT} (transport: ws=${AE200_PREFER_WS}, interval=${AE200_SCAN_INTERVAL}s)"
+
+exec python3 /usr/bin/ae200_bridge.py

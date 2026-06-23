@@ -1,0 +1,45 @@
+name: Mitsubishi AE-200
+version: "0.1.0"
+slug: mitsubishi_ae200
+description: >-
+  Control Mitsubishi Electric AE-200 / AE-50 / EW-50 centralised HVAC
+  controllers from Home Assistant via MQTT Discovery. Auto-discovers zones,
+  exposes native climate entities, filter/fault diagnostics and remote lockout.
+url: "https://github.com/GitDakky/mitsubishi-ae200-hass"
+arch:
+  - aarch64
+  - amd64
+  - armv7
+  - armhf
+  - i386
+init: false
+startup: application
+# Restart the add-on automatically if the process exits unexpectedly.
+watchdog: "tcp://[HOST]:[PORT:0]"
+boot: auto
+hassio_api: true
+homeassistant_api: false
+# MQTT service discovery: the add-on auto-fills broker details when the
+# Mosquitto add-on (or any provider) is configured. Manual override possible.
+services:
+  - "mqtt:need"
+host_network: false
+map:
+  - share:rw
+options:
+  ae200_host: ""
+  ae200_port: 80
+  prefer_websocket: true
+  scan_interval: 30
+  log_level: info
+schema:
+  ae200_host: str
+  ae200_port: port
+  prefer_websocket: bool
+  scan_interval: int(15,600)
+  log_level: list(trace|debug|info|warning|error|fatal)
+  # Optional manual MQTT override; leave blank to use the auto-discovered broker.
+  mqtt_host: str?
+  mqtt_port: port?
+  mqtt_username: str?
+  mqtt_password: password?

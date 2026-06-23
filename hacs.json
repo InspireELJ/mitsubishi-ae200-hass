@@ -1,0 +1,7 @@
+{
+  "name": "Mitsubishi AE-200 / EW-50",
+  "content_in_root": false,
+  "filename": "ae200",
+  "render_readme": true,
+  "homeassistant": "2024.4.0"
+}

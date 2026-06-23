@@ -1,0 +1,6 @@
+#!/usr/bin/with-contenv bashio
+# If the bridge service stops, bring the whole add-on down so the Supervisor
+# watchdog/auto-restart policy takes over (rather than leaving a half-dead
+# container running with no bridge).
+bashio::log.warning "AE-200 bridge service exited with code $1; signalling add-on stop."
+exec /run/s6/basedir/bin/halt
