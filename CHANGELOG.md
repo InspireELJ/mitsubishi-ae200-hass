@@ -3,6 +3,34 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1b1] - 2026-10-16
+
+### Added
+- Response-only `ae200.read_member_runtime` action for one explicit entry,
+  topology-validated IC address, Gregorian date and `FAN_TIME` or `THERMO_TIME`.
+  Each invocation sends one minimal GET with a controller-wide 15-second
+  cooldown measured from completion.
+- Independent raw history, errors and freshness, with nullable projections
+  for the IC member daily channel's 48 half-hour minute intervals. Up to
+  32 selector samples are retained by a local LRU policy; this is not server
+  storage capacity or history retention.
+
+### Validation scope
+- One selected live `FAN_TIME` response contained 48 zero tokens. This confirms
+  the request and CSV shape, not measured idle time, collection validity,
+  non-zero data or `THERMO_TIME` support. HA action acceptance remains pending.
+- The single-record/attribute limits, 1970–2037 input window and nullable
+  0–30-minute projection are conservative pilot policies, not vendor capacity,
+  retention or wire-range guarantees. Raw evidence is retained without
+  padding, truncation, zero-fill or clamping.
+- No startup or periodic trend query, automatic day/channel scan, daily sum,
+  cross-member aggregate, statistics entity, UTC conversion or operating-state
+  inference is introduced. Existing identifiers and controls are preserved.
+
+### Release sequence
+- Start the `0.2.1b1` prerelease patch series without changing existing tags.
+  HACS installation instructions require explicit target-tag verification.
+
 ## [0.2.0b10] - 2026-10-16
 
 ### Added
@@ -29,8 +57,10 @@ All notable changes to this project are documented here. The format is based on
 - One idle ordinary group passed a local filter-reset restriction change with
   acknowledgement and matching five-field readback. Unrequested effective
   restrictions and operating settings were preserved, and the original five
-  raw fields and operating state were restored and checked. Deployed HA action
-  acceptance remains pending; physical wall-remote buttons were not tested.
+  raw fields and operating state were restored and checked. Deployed HA actions
+  also confirmed the selected filter-reset restriction and exact restoration,
+  with identifiers and automations retained. Physical wall-remote buttons were
+  not tested.
 - Shared locks do not provide a controller-side compare-and-set guarantee
   against external writers.
 - A separate minimal capability read confirmed the four-field pilot profile.

@@ -11,7 +11,7 @@ rest of the library can deal in plain Python strings rather than magic values.
 
 from __future__ import annotations
 
-VERSION = "0.2.0b10"
+VERSION = "0.2.1b1"
 
 # Transport
 DEFAULT_HTTP_PATH = "/servlet/MIMEReceiveServlet"

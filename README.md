@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-This source targets the `0.2.0b10` per-function local-restrictions pilot.
+This source targets the `0.2.1b1` member daily-runtime diagnostic pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -79,9 +79,20 @@ one five-field command and one bounded readback. No-op requests do not write;
 acknowledgements, observed values and uncertain outcomes remain distinct.
 The legacy switch and existing identifiers are preserved. A limited live
 filter-reset restriction change and exact five-field restoration passed
-acknowledgement/readback checks with operating settings preserved. HA action
-acceptance remains pending; physical wall-remote buttons were not tested. See
+acknowledgement/readback checks with operating settings preserved. Deployed HA
+actions also confirmed the selected filter-reset restriction and exact restore,
+with original identifiers and automations retained. Physical wall-remote
+buttons were not tested. See
 [per-function local restrictions](docs/local-restrictions.md).
+
+Version `0.2.1b1` adds an explicit read-only action for one configured IC
+member, one date and one runtime data name. It retains raw history and 48
+nullable half-hour projections with independent freshness and bounded local
+retention. One live `FAN_TIME` sample returned 48 zero tokens, establishing the
+response shape without proving idle time or enabled collection. HA action
+acceptance is pending. No total, statistics entity, automatic history scan or
+current operating-state inference is added. See
+[member runtime diagnostics](docs/member-runtime.md).
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts

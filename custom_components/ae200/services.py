@@ -8,7 +8,7 @@ import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from ._pymelans import MelansError, cached_snapshot
+from ._pymelans import MelansError, cached_snapshot, member_runtime
 from .const import DOMAIN
 
 SERVICE_READ_MEMBER = "read_member"
@@ -17,11 +17,14 @@ SERVICE_READ_TODAY_SCHEDULE = "read_today_schedule"
 SERVICE_READ_CONTROLLER_CLOCK = "read_controller_clock"
 SERVICE_READ_WEEKLY_PATTERN = "read_weekly_pattern"
 SERVICE_SET_LOCAL_RESTRICTIONS = "set_local_restrictions"
+SERVICE_READ_MEMBER_RUNTIME = "read_member_runtime"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 ATTR_ADDRESS = "address"
 ATTR_GROUP_ID = "group_id"
 ATTR_SEASON = "season"
 ATTR_PATTERN = "pattern"
+ATTR_DATE_ISO = "date_iso"
+ATTR_DATA_NAME = "data_name"
 _LOCAL_RESTRICTION_FIELDS = {
     "power_prohibited": "power",
     "mode_prohibited": "mode",
@@ -123,6 +126,28 @@ SET_LOCAL_RESTRICTIONS_SCHEMA = vol.All(
         **{vol.Optional(field): _strict_bool for field in _LOCAL_RESTRICTION_FIELDS},
     }),
     _require_local_patch,
+)
+
+
+def _runtime_selector(data: dict[str, Any]) -> dict[str, Any]:
+    """Share strict address/date/channel validation with the protocol layer."""
+    try:
+        selector = member_runtime._selector(
+            data[ATTR_ADDRESS], data[ATTR_DATE_ISO], data[ATTR_DATA_NAME]
+        )
+    except ValueError as err:
+        raise vol.Invalid(str(err)) from err
+    return {**data, ATTR_ADDRESS: int(selector["Address"])}
+
+
+READ_MEMBER_RUNTIME_SCHEMA = vol.All(
+    vol.Schema({
+        vol.Required(ATTR_CONFIG_ENTRY_ID): vol.All(str, vol.Length(min=1)),
+        vol.Required(ATTR_ADDRESS): object,
+        vol.Required(ATTR_DATE_ISO): object,
+        vol.Required(ATTR_DATA_NAME): object,
+    }),
+    _runtime_selector,
 )
 
 
@@ -261,6 +286,27 @@ def async_setup_services(hass: HomeAssistant) -> None:
         # remain visible and never trigger another write, read or refresh here.
         return report
 
+    async def async_read_member_runtime(call: ServiceCall) -> ServiceResponse:
+        coordinator = _entry_coordinator(hass, call.data[ATTR_CONFIG_ENTRY_ID])
+        try:
+            runtime = await coordinator.client.async_read_member_runtime(
+                call.data[ATTR_ADDRESS], call.data[ATTR_DATE_ISO], call.data[ATTR_DATA_NAME]
+            )
+        except ValueError as err:
+            raise ServiceValidationError(str(err)) from err
+        except MelansError as err:
+            raise HomeAssistantError("The AE-200 member runtime read failed") from err
+        if isinstance(runtime, dict) and runtime.get("read_status") == "cooldown":
+            raise HomeAssistantError(
+                "The AE-200 member runtime read is cooling down. "
+                "Wait at least 15 seconds before another member runtime read"
+            )
+        if not isinstance(runtime, dict) or runtime.get("read_status") not in ("updated", "error"):
+            raise HomeAssistantError("The AE-200 read did not produce a member runtime sample")
+        # Retain the client's independently timed evidence, including unknown
+        # measurement validity. Never sum buckets or infer current operation.
+        return runtime
+
     if not hass.services.has_service(DOMAIN, SERVICE_READ_MEMBER):
         hass.services.async_register(
             DOMAIN,
@@ -307,5 +353,13 @@ def async_setup_services(hass: HomeAssistant) -> None:
             SERVICE_SET_LOCAL_RESTRICTIONS,
             async_set_local_restrictions,
             schema=SET_LOCAL_RESTRICTIONS_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_READ_MEMBER_RUNTIME):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_READ_MEMBER_RUNTIME,
+            async_read_member_runtime,
+            schema=READ_MEMBER_RUNTIME_SCHEMA,
             supports_response=SupportsResponse.ONLY,
         )
