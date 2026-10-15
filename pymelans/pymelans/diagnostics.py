@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from . import const, protocol
+from . import capabilities, const, protocol
 from .client import MelansClient
 
 _SENSITIVE = re.compile(
@@ -54,6 +54,14 @@ def cached_snapshot(client: MelansClient) -> dict[str, Any]:
             "quality": client.group_quality(gid),
             "last_successful_read": last_seen.isoformat() if last_seen else None,
             "raw_attributes": raw,
+            "capability_attributes": {
+                key: value
+                for key, value in dev.capability_attributes.items()
+                if key in capabilities.READ_ATTRIBUTES
+            },
+            "supported_modes": dev.supported_modes,
+            "supported_fan_speeds": dev.supported_fan_speeds,
+            "supported_air_directions": dev.supported_air_directions,
             "unrequested_attributes": sorted(set(raw) - set(protocol._MNET_READ_ATTRS)),
             "warnings": warnings,
         }
@@ -68,6 +76,7 @@ def cached_snapshot(client: MelansClient) -> dict[str, Any]:
         "configured_group_count": len(client._names),
         "failed_groups": sorted(client.failed_groups, key=int),
         "read_errors": client.group_errors,
+        "capability_error": client.capability_error,
         "last_command": _redact(client.last_command),
         "groups": groups,
         "notes": [

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.climate import (
+    ATTR_HVAC_MODE,
     ClimateEntity,
     ClimateEntityFeature,
     HVACMode,
@@ -38,6 +39,18 @@ _FAN_TO_HA = {
     mc.FAN_AUTO: "auto",
 }
 _HA_TO_FAN = {v: k for k, v in _FAN_TO_HA.items()}
+
+# MELANS vane positions are not angles or separate horizontal swing controls.
+_SWING_TO_HA = {
+    "HORIZONTAL": "fixed_horizontal",
+    "MID0": "mid_0",
+    "MID1": "mid_1",
+    "MID2": "mid_2",
+    "VERTICAL": "fixed_vertical",
+    "SWING": "swing",
+    "AUTO": "auto",
+}
+_HA_TO_SWING = {v: k for k, v in _SWING_TO_HA.items()}
 
 
 async def async_setup_entry(
@@ -89,6 +102,39 @@ class AE200Climate(AE200Entity, ClimateEntity):
     def target_temperature(self) -> float | None:
         return self.device.target_temperature if self.device else None
 
+    def _temperature_envelope(self) -> tuple[float, float]:
+        """Cover selectable modes before HA validates a combined service call.
+
+        HA checks these entity-wide limits before passing the requested mode
+        to async_set_temperature. The client then enforces that mode's exact
+        limits before sending the combined command.
+        """
+        fallback = (super().min_temp, super().max_temp)
+        dev = self.device
+        if dev is None:
+            return fallback
+        ranges = [
+            dev.temperature_range(_HA_TO_MODE[mode]) or fallback
+            for mode in self.hvac_modes
+            if mode in (HVACMode.COOL, HVACMode.HEAT, HVACMode.DRY, HVACMode.HEAT_COOL)
+        ]
+        if not ranges:
+            return fallback
+        return min(bounds[0] for bounds in ranges), max(bounds[1] for bounds in ranges)
+
+    @property
+    def min_temp(self) -> float:
+        return self._temperature_envelope()[0]
+
+    @property
+    def max_temp(self) -> float:
+        return self._temperature_envelope()[1]
+
+    @property
+    def target_temperature_step(self) -> float:
+        step = self.device.temperature_step if self.device else None
+        return step if step is not None else self._attr_target_temperature_step
+
     @property
     def hvac_mode(self) -> HVACMode | None:
         dev = self.device
@@ -106,10 +152,50 @@ class AE200Climate(AE200Entity, ClimateEntity):
         return _FAN_TO_HA.get(dev.fan_speed)
 
     @property
+    def fan_modes(self) -> list[str]:
+        speeds = self.device.supported_fan_speeds if self.device else None
+        if speeds is None:
+            return list(self._attr_fan_modes)
+        return [_FAN_TO_HA[speed] for speed in speeds if speed in _FAN_TO_HA]
+
+    @property
+    def hvac_modes(self) -> list[HVACMode]:
+        modes = self.device.supported_modes if self.device else None
+        if modes is None:
+            return list(self._attr_hvac_modes)
+        return [HVACMode.OFF, *(_MODE_TO_HA[mode] for mode in modes if mode in _MODE_TO_HA)]
+
+    @property
+    def supported_features(self) -> ClimateEntityFeature:
+        features = self._attr_supported_features
+        if self.device and self.device.capability_attributes.get("GroupType") == "NEW":
+            # NEW groups require separate setpoint fields. The client also
+            # guards direct temperature writes until that protocol is verified.
+            features &= ~ClimateEntityFeature.TARGET_TEMPERATURE
+        if self.device and self.device.supported_fan_speeds == []:
+            features &= ~ClimateEntityFeature.FAN_MODE
+        if self.swing_modes:
+            features |= ClimateEntityFeature.SWING_MODE
+        return features
+
+    @property
+    def swing_mode(self) -> str | None:
+        dev = self.device
+        return _SWING_TO_HA.get(dev.air_direction) if dev else None
+
+    @property
+    def swing_modes(self) -> list[str] | None:
+        directions = self.device.supported_air_directions if self.device else None
+        if not directions:
+            return None
+        return [_SWING_TO_HA[direction] for direction in directions if direction in _SWING_TO_HA]
+
+    @property
     def extra_state_attributes(self) -> dict[str, Any]:
         dev = self.device
         if not dev:
             return {}
+        limits = dev.temperature_range()
         return {
             "group_id": dev.group_id,
             "air_direction": dev.air_direction,
@@ -119,13 +205,29 @@ class AE200Climate(AE200Entity, ClimateEntity):
             "transport": self.coordinator.client.transport_name,
             "data_quality": self.coordinator.client.group_quality(self._group_id),
             "fan_speed_raw": dev.fan_speed,
+            "current_mode_min_temp_celsius": limits[0] if limits else None,
+            "current_mode_max_temp_celsius": limits[1] if limits else None,
         }
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         temp = kwargs.get(ATTR_TEMPERATURE)
-        if temp is not None:
-            await self.coordinator.client.set_temperature(self._group_id, float(temp))
-            await self.coordinator.async_request_refresh()
+        hvac_mode = kwargs.get(ATTR_HVAC_MODE)
+        if temp is None and hvac_mode is None:
+            raise ValueError("temperature or HVAC mode is required")
+        temperature = float(temp) if temp is not None else None
+        client = self.coordinator.client
+        if hvac_mode is None:
+            await client.set_temperature(self._group_id, temperature)
+        elif hvac_mode == HVACMode.OFF:
+            await client.set_climate(self._group_id, power=False, temperature=temperature)
+        else:
+            mode = _HA_TO_MODE.get(hvac_mode)
+            if mode is None or hvac_mode not in self.hvac_modes:
+                raise ValueError(f"unsupported HVAC mode: {hvac_mode}")
+            await client.set_climate(
+                self._group_id, mode=mode, power=True, temperature=temperature
+            )
+        await self.coordinator.async_request_refresh()
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         client = self.coordinator.client
@@ -133,19 +235,26 @@ class AE200Climate(AE200Entity, ClimateEntity):
             await client.set_power(self._group_id, False)
         else:
             mode = _HA_TO_MODE.get(hvac_mode)
-            if mode is None:
-                return
-            # Ensure the unit is on, then set the mode.
-            if self.device and not self.device.is_on:
-                await client.set_power(self._group_id, True)
-            await client.set_mode(self._group_id, mode)
+            if mode is None or hvac_mode not in self.hvac_modes:
+                raise ValueError(f"unsupported HVAC mode: {hvac_mode}")
+            # Set mode and power together, avoiding a start in the old mode if
+            # the controller rejects the requested mode afterwards.
+            await client.set_climate(self._group_id, mode=mode, power=True)
         await self.coordinator.async_request_refresh()
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         speed = _HA_TO_FAN.get(fan_mode)
-        if speed is not None:
-            await self.coordinator.client.set_fan_speed(self._group_id, speed)
-            await self.coordinator.async_request_refresh()
+        if speed is None or fan_mode not in self.fan_modes:
+            raise ValueError(f"unsupported fan mode: {fan_mode}")
+        await self.coordinator.client.set_fan_speed(self._group_id, speed)
+        await self.coordinator.async_request_refresh()
+
+    async def async_set_swing_mode(self, swing_mode: str) -> None:
+        direction = _HA_TO_SWING.get(swing_mode)
+        if direction is None or swing_mode not in (self.swing_modes or []):
+            raise ValueError(f"unsupported swing mode: {swing_mode}")
+        await self.coordinator.client.set_air_direction(self._group_id, direction)
+        await self.coordinator.async_request_refresh()
 
     async def async_turn_on(self) -> None:
         await self.coordinator.client.set_power(self._group_id, True)

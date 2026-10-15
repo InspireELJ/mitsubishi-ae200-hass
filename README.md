@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-The `feat/inspire-monitoring-pilot` branch contains the `0.2.0b2` monitoring pilot.
+The company `main` branch contains the `0.2.0b3` capability pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -12,10 +12,18 @@ per-group freshness, controller health, checked command acknowledgements,
 cached raw-field diagnostics and a self-contained HACS bundle. Zero humidity
 is treated as an unverified value rather than a measurement.
 
+Version `0.2.0b3` adds a bounded capability query, per-group mode and fan choices,
+vertical vane control, reported temperature precision and limits, atomic
+mode/power commands and cached command-readback diagnostics. See the
+[capability matrix and development scope](docs/capabilities.md) for verified
+behaviour, equipment-family limits and the remaining expansion work.
+
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts
-use API boundary stubs. Real HA/controller end-to-end validation is still
-required before relying on this beta for unattended critical operations.
+use API boundary stubs. A live ordinary indoor AC group has accepted and
+confirmed temperature, fan, vane and compound fan-only/power commands, with
+its original settings restored. This does not validate every controller,
+equipment family or licensed function.
 
 The underlying protocol source remains in `pymelans/`. Run
 `python scripts/sync_ha_library.py` after changing it; never edit the generated
