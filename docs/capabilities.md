@@ -24,7 +24,7 @@ promise of support:
 
 Implementation status has a separate meaning:
 
-- **Implemented**: present in the `0.2.0b5` source. Individual device support
+- **Implemented**: present in the `0.2.0b6` source. Individual device support
   and end-to-end acceptance still apply. This is not a claim that every row has
   passed a live control test or that an installation has loaded this version.
 - **Shared library only**: protocol support exists without a complete native HA
@@ -32,7 +32,28 @@ Implementation status has a separate meaning:
 - **Planned**: a candidate requiring implementation, additional protocol
   evidence or a suitable device. It is not currently a supported HA feature.
 
-## Scope of 0.2.0b5
+## Scope of 0.2.0b6
+
+The existing local-remote switch now has four cached effective prohibition
+attributes for local power, mode, temperature and filter reset. Its identifier,
+legacy `RemoCon` on/off interpretation and single-field writes are preserved.
+The on state does not establish that every local function is prohibited, and
+no new per-function restriction write is added. Effective attributes become
+unknown if the switch is unavailable because the group is stale, its read
+failed or the coordinator update failed; old cached values do not establish
+current local permissions.
+
+The response-only `ae200.read_control_context` action requires an explicit
+integration entry and configured group. It performs two sequential minimal
+reads: global `SystemData.AllTurnOff`, then group `TurnOff` and `BACnetTurnOff`.
+The controller web client labels these as emergency-stop and energy-saving
+stop flags; they are not measurements of physical running state or proof of a
+particular cause. Independent errors and freshness allow partial responses.
+The action has a controller-wide 15-second cooldown from completion, adds no
+automatic query or periodic polling, and does not gate central HA commands.
+See [control-context diagnostics](control-context.md) for the interpretation.
+
+## Metadata scope introduced in 0.2.0b5
 
 The native integration attempts a minimal `SystemData` read and a separate
 `FunctionControl/FunctionList` read once at setup or reload. Cached diagnostics
@@ -126,8 +147,9 @@ behaviour and diagnostic entities described here apply to HACS.
 | Cached diagnostics and command confirmation | Implemented; capability details and optional command-status entity added in 0.2.0b3 | Cached exporter and checked write acknowledgement/readback implementation. | Keep diagnostics free of additional controller requests and distinguish acceptance from confirmed state. The new status sensor is disabled by default. |
 | Controller display model and versions | Cached read-only diagnostics in 0.2.0b5 | Official `SystemData` builder and live minimal response structure. | Preserve raw version strings and unknown fields; exclude serial numbers and network settings. This is a setup snapshot, not a periodic firmware monitor. |
 | Licence-status summary | Cached read-only diagnostics in 0.2.0b5 | Official `FunctionList` model and live directory response. | Verify each desired endpoint and connected hardware independently. Active licence status alone proves neither capability nor usable data; raw time limits are not computed expiry dates. |
-| General local remote lock | Implemented legacy switch | Existing `RemoCon` setter and state parser. | This switch is retained for compatibility and is not yet gated by the newly read prohibition capability flags. Verify applicability before using it on another device family. |
-| Per-function local remote prohibitions | Planned | Official client separates drive, mode, temperature, filter reset, vane, fan and timer prohibition items. | Confirm the desired scope and each write/readback. These flags restrict local controls; they are not hardware capability flags. |
+| Local remote prohibition summary | Implemented legacy switch; clarified in 0.2.0b6 | Existing `RemoCon` setter and state parser. | Preserve the old identifier and single-field write. Its on state alone does not prove that every local control is prohibited. |
+| Per-function local remote prohibitions | Four cached read-only effective attributes in 0.2.0b6; additional items and writes planned | Official client combines the summary and individual power, mode, temperature and filter-reset items. | Keep missing or unrecognised combinations unknown. These flags restrict local controls; they are not hardware capabilities or gates on HA central commands. |
+| Global and group stop context | Explicit read-only diagnostic action in 0.2.0b6 | Official emergency-stop and energy-saving labels, strict minimal requests and live response structures. | Keep global/group freshness and errors separate. Stale typed values remain unknown, and no physical operation, cause, stop clearing or BACnet availability is inferred. |
 | Group members, M-NET addresses and equipment family | Implemented as cached read-only diagnostics in 0.2.0b4 | Official `MnetGroupList` model and live configured membership. | Broaden representative multi-member hardware acceptance before creating additional devices or changing entity relationships. |
 | Detailed equipment identity and capacities | Planned | Address-level models include model, capacity, location and system codes. | Confirm which codes are populated and obtain an authoritative decoding before presenting a model or capacity as fact. |
 | Actual Thermo-ON, fan and defrost state | Raw on-demand member diagnostics in 0.2.0b4; operational entities planned | Complete live ThermoStatus/FanStatus strings and a fan-only test. DefrostStatus rejected by pilot firmware. | Validate XML value semantics and group aggregation. Power on and a cooling mode do not prove active cooling or compressor operation. |

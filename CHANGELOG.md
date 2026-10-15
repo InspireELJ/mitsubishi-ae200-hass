@@ -3,6 +3,33 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0b6] - 2026-10-16
+
+### Added
+- Four cached effective local-prohibition attributes on the existing remote-lock
+  switch, distinguishing power, mode, temperature and filter reset. The legacy
+  switch identifier, reported on/off state and single-field writes are preserved.
+  Unavailable, stale or failed group data makes the effective attributes unknown.
+- Response-only `ae200.read_control_context` action for an explicitly selected
+  integration entry and configured group. Two sequential minimal reads retain
+  independent global/group stop-flag samples, errors and freshness.
+- Controller-wide control-context cooldown, measured from completion, without
+  automatic context reads, periodic polling or new entities. Partial and failed
+  reads retain their diagnostic response and historical raw samples.
+
+### Fixed
+- Describe `RemoCon` as a local-prohibition summary rather than proof that all
+  remote functions are locked. Per-function values remain read-only and do not
+  gate central HA commands or rewrite automations.
+
+### Validation scope
+- Bounded global and group stop-field reads confirmed the response structures.
+  Unknown and stale flags remain unknown in typed output, while cached raw
+  tokens are retained. No stop-clearing or new prohibition write is introduced.
+- Protocol, isolation, cooldown and HA contract tests cover partial failures and
+  unknown values. Reported stop flags do not establish physical operating state,
+  identify the cause of a stop or prove an active BACnet installation.
+
 ## [0.2.0b5] - 2026-10-16
 
 ### Added
