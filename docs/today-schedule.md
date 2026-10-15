@@ -104,6 +104,13 @@ can return an `updated` or `error` diagnostic response. Invalid targets and
 cooldown calls raise an action error instead. Before a successful sample
 exists, its successful-read time remains unknown.
 
+From `0.2.1b7`, a started cancelled attempt records a safe `CancelledError`,
+preserves the previous raw records and success time as stale, and leaves a cold
+sample unknown. Typed hour/minute values become unknown. Cancellation
+propagates without retry and starts the completion cooldown; cancellation
+while waiting for the schedule lock makes no attempt or cache change. Offline
+tests cover this behaviour without live outage or cancellation injection.
+
 The snapshot has its own freshness. Normal climate polling does not refresh
 it. A failed optional read does not change climate availability or group-state
 freshness. Historical raw

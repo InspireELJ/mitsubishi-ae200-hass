@@ -90,6 +90,39 @@ No status is fabricated from the type or code; native status options,
 including unknown outcome handling, remain unchanged. This adds no request,
 retry, confirmation or new control capability.
 
+## Group-poll error export isolation in 0.2.1b7
+
+Stored group-poll error codes use the existing bounded error formatter.
+Codes must be ASCII letters, digits, `_` or `-`, with length 1–32; missing or
+invalid codes become null. This changes error metadata, not polling timing,
+the wire request or controller-side behaviour.
+
+The cached `read_errors` export then applies an independent filter:
+
+| Element | Export rule |
+|---|---|
+| Group key | Canonical decimal string 1–50; malformed keys are omitted, not coerced |
+| `type` | ASCII letters, digits, `_` or `-`, length 1–64; otherwise null |
+| `code` | Same character set, length 1–32; otherwise null |
+| Other record keys | Omitted, including message, URL or arbitrary extra fields |
+
+Valid historical group keys are retained even if absent from the current
+configured-name list. A non-dictionary record becomes `{type: null, code: null}`;
+a non-dictionary outer cache exports an empty dictionary. Future valid short
+type tokens can survive here. Type and code are filtered independently, so an
+invalid type does not discard an otherwise valid code. This is separate from the last-command sensor's
+six-class allowlist above.
+
+Every export creates new outer and inner dictionaries. Changing returned
+diagnostic errors therefore cannot change the live client's error records.
+The original cache is not mutated by filtering. Other raw diagnostic field
+rules are unchanged, and exporting diagnostics still performs no I/O.
+
+Synthetic offline cases established that unbounded error-code strings could
+previously be exported and that returned error dictionaries shared references
+with client state. The fix does not assert an actual site credential leak,
+external attack or live fault-injection result.
+
 ## Validation boundary
 
 Offline HA contracts cover fresh/unknown and unavailable states, allowlisted

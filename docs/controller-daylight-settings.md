@@ -2,8 +2,9 @@
 
 Version `0.2.1b6` adds the response-only `ae200.read_daylight_settings` action.
 It reads one controller's `SummerTime` configuration and retains eleven
-allowlisted raw fields with independent read/cache metadata. HA action
-deployment acceptance remains pending.
+allowlisted raw fields with independent read/cache metadata. Deployed HA
+acceptance has passed for one selected controller and an immediate-repeat
+cooldown check.
 
 The bounded purpose is to inspect reported clock-adjacent configuration without
 adjusting the clock. The result does not establish that daylight adjustment is
@@ -145,7 +146,16 @@ timezone field. This does not validate active transitions, clock accuracy,
 rule correctness, all firmware or other controllers. Private addresses and
 configuration values remain outside public documentation.
 
-HA action deployment acceptance remains pending. See
+The deployed HA integration and library loaded `0.2.1b6`. Its action returned
+updated/fresh with all eleven XML-decoded raw fields matching cached diagnostics
+and the prior protocol sample. An immediate repeat within 15 seconds raised
+the cooldown error. The cache then recorded `read_status: cooldown`, while
+the other six snapshot fields, sample and attempt/success times were unchanged.
+Existing identifiers, operating settings, permissions and automations were
+preserved. No Clock or rule write, derived timezone or current-DST claim was
+introduced. Partial, error and cancellation cases retain offline evidence.
+
+See
 [controller-clock diagnostics](controller-clock.md) for the separate six-field
 reader, [diagnostic state quality](diagnostic-state-quality.md) for cached HA
 flags and [capability boundaries](capabilities.md) for wider evidence limits.
