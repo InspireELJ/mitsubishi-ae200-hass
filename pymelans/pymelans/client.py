@@ -7,10 +7,11 @@ import math
 import re
 import time
 from datetime import UTC, datetime
+from typing import Any
 
 import aiohttp
 
-from . import capabilities, const, metadata, protocol, topology
+from . import capabilities, const, control_context, metadata, protocol, topology
 from .device import MelansDevice
 from .exceptions import MelansCommandUncertainError, MelansConnectionError, MelansError
 from .transport import HttpTransport, WebsocketTransport
@@ -48,6 +49,11 @@ class MelansClient:
         self._functions_attempted = False
         self._metadata_lock = asyncio.Lock()
         self._functions_lock = asyncio.Lock()
+        self._control_context_lock = asyncio.Lock()
+        self._last_control_context_request: float | None = None
+        self._control_global: dict[str, Any] = {}
+        self._control_groups: dict[str, dict[str, Any]] = {}
+        self._control_read_status: dict[str, str] = {}
         self.topology: topology.MembershipSnapshot | None = None
         self.topology_last_attempt: datetime | None = None
         self.topology_last_success: datetime | None = None
@@ -219,6 +225,101 @@ class MelansClient:
             self.function_list = snapshot
             self.functions_last_success = datetime.now(UTC)
             self.functions_error = None
+
+    async def async_read_control_context(self, group_id: str | int) -> dict[str, Any]:
+        """Explicitly sample global/group stop flags, with independent errors.
+
+        Two small optional reads share the normal controller I/O path. No
+        state, fault, command, or climate freshness is inferred or refreshed.
+        """
+        group = topology._identifier(group_id, const.MAX_GROUPS)
+        if group not in self._names:
+            raise ValueError("group_id is outside the configured group allowlist")
+        async with self._control_context_lock:
+            if (
+                self._last_control_context_request is not None
+                and time.monotonic() - self._last_control_context_request < const.MIN_POLL_INTERVAL
+            ):
+                self._control_read_status[group] = "cooldown"
+                return self.control_context_snapshot(group)
+            target = self._control_groups.setdefault(group, {})
+            reads = (
+                (self._control_global, control_context.build_global_control_context_request(),
+                 control_context.parse_global_control_context),
+                (target, control_context.build_group_control_context_request(group),
+                 lambda payload: control_context.parse_group_control_context(
+                     payload, expected_group=group)),
+            )
+            successes = 0
+            try:
+                for record, request, parse in reads:
+                    record["last_attempt"] = datetime.now(UTC)
+                    try:
+                        response = await self._request(request)
+                        sample = parse(response)
+                    except MelansError as error:
+                        record["error"] = self._optional_read_error(error)
+                    else:
+                        record.update(
+                            sample=sample, last_success=datetime.now(UTC),
+                            seen=time.monotonic(), error=None,
+                        )
+                        successes += 1
+            finally:
+                self._last_control_context_request = time.monotonic()
+            self._control_read_status[group] = (
+                "updated" if successes == 2 else "partial" if successes else "error"
+            )
+            return self.control_context_snapshot(group)
+
+    def _control_record_snapshot(self, record: dict[str, Any], *, global_: bool) -> dict[str, Any]:
+        seen = record.get("seen")
+        fresh = (
+            seen is not None and not record.get("error")
+            and time.monotonic() - seen <= self.stale_after
+        )
+        result: dict[str, Any] = {
+            "quality": "fresh" if fresh else "stale" if seen is not None else "unknown",
+            "last_attempt": record["last_attempt"].isoformat() if record.get("last_attempt") else None,
+            "last_successful_read": record["last_success"].isoformat() if record.get("last_success") else None,
+            "error": dict(record["error"]) if record.get("error") else None,
+            "raw_attributes": {},
+        }
+        sample = record.get("sample")
+        if global_:
+            result["global_emergency_stop"] = sample.all_turn_off if fresh else None
+            if sample is not None:
+                result["raw_attributes"] = {"AllTurnOff": sample.all_turn_off_raw}
+        else:
+            result["bacnet_emergency_stop"] = sample.bacnet_turn_off if fresh else None
+            result["energy_saving_stop"] = sample.turn_off if fresh else None
+            if sample is not None:
+                result["raw_attributes"] = {
+                    "Group": sample.group_id, "TurnOff": sample.turn_off_raw,
+                    "BACnetTurnOff": sample.bacnet_turn_off_raw,
+                }
+        return result
+
+    def control_context_snapshot(self, group_id: str | int | None = None) -> dict[str, Any]:
+        """Export only cached optional context, never stale typed stop claims."""
+        global_record = self._control_record_snapshot(self._control_global, global_=True)
+        if group_id is None:
+            return {
+                "global": global_record,
+                "groups": {group: self._control_record_snapshot(record, global_=False)
+                           for group, record in sorted(self._control_groups.items(), key=lambda v: int(v[0]))},
+            }
+        group = topology._identifier(group_id, const.MAX_GROUPS)
+        group_record = self._control_record_snapshot(self._control_groups.get(group, {}), global_=False)
+        flags = (global_record["global_emergency_stop"],
+                 group_record["bacnet_emergency_stop"], group_record["energy_saving_stop"])
+        return {
+            "group_id": group,
+            "read_status": self._control_read_status.get(group, "unknown"),
+            "global": global_record, "group": group_record,
+            "control_inhibited": True if any(flag is True for flag in flags)
+            else False if all(flag is False for flag in flags) else None,
+        }
 
     async def async_load_topology(self) -> None:
         """Attempt the optional configured-member directory once per client.

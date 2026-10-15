@@ -30,6 +30,20 @@
     }
   },
   "services": {
+    "read_control_context": {
+      "name": "Read control context",
+      "description": "Read the controller and selected group's stop context on demand without changing settings. Each part reports its own data quality. Reads share a minimum 15 second interval.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Controller",
+          "description": "The AE-200 configuration entry to read from. Select it explicitly even when only one controller is configured."
+        },
+        "group_id": {
+          "name": "Group number",
+          "description": "One configured group number from 1 to 50 on the selected controller."
+        }
+      }
+    },
     "read_member": {
       "name": "Read indoor unit member",
       "description": "Read one indoor unit address verified by this controller's cached topology and return its diagnostic sample. Member reads share a minimum 15 second interval and are never polled automatically.",

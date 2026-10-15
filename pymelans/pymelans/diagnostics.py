@@ -149,6 +149,7 @@ def cached_snapshot(client: MelansClient) -> dict[str, Any]:
         "read_errors": client.group_errors,
         "capability_error": client.capability_error,
         "last_command": _redact(client.last_command),
+        "control_context": client.control_context_snapshot(),
         "controller_metadata": {
             "attempted": client._metadata_attempted,
             "last_attempt": client.metadata_last_attempt.isoformat() if client.metadata_last_attempt else None,
@@ -189,5 +190,6 @@ def cached_snapshot(client: MelansClient) -> dict[str, Any]:
             "No controller firmware, licence, Thermo-ON or energy support is inferred from absent fields.",
             "Versions and function statuses are startup snapshots, not continuously refreshed state.",
             "An active licence does not establish endpoint or equipment support; time limits are raw tokens.",
+            "Control-context reads are explicit and independently timed; stale typed stop flags are unknown.",
         ],
     }

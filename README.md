@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-The company `main` branch contains the `0.2.0b5` controller metadata pilot.
+The company `main` branch contains the `0.2.0b6` control-context diagnostics pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -28,6 +28,12 @@ HTTP replay of a websocket write whose result became uncertain after sending
 began. See [controller metadata and command outcomes](docs/controller-metadata.md).
 Licence status describes the reported entitlement, rather than verified
 hardware, endpoint or measurement support.
+
+Version `0.2.0b6` clarifies the existing local-remote switch with per-function
+prohibition attributes and adds an explicit read-only control-context action.
+It reads global and group stop flags on demand, with independent freshness,
+partial-error reporting and a controller-wide cooldown. See
+[local restrictions and control context](docs/control-context.md).
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts
@@ -76,10 +82,10 @@ vane controls currently extend beyond the MQTT add-on's feature set.
 | Needs MQTT broker | Yes (auto-detected Mosquitto) | No |
 | Best for | HA OS / Supervised, "set and forget", BMS sites | HA Core/Container, simplest path |
 
-Both give you `climate` entities per zone plus filter, fault and remote-lockout
-controls. Most home users want the **custom integration**; site/building
-managers who value the watchdog and a dedicated settings page often prefer the
-**add-on**.
+Both give you `climate` entities per zone plus filter and fault diagnostics,
+and the legacy local-remote summary switch. Most home users want the
+**custom integration**; site/building managers who value the watchdog and a
+dedicated settings page often prefer the **add-on**.
 
 ---
 
@@ -92,9 +98,10 @@ managers who value the watchdog and a dedicated settings page often prefer the
   these choices using reported capabilities and adds vertical vane control.
 - **Diagnostics** per unit: return-air temperature, filter-cleaning alert,
   fault flag, and (where supported) outdoor temperature and humidity.
-- **Local remote lockout** switch (`RemoCon`): lock out the wall/handset
-  remote so occupants cannot override a centrally managed setpoint. A genuine
-  building-manager feature.
+- **Local remote prohibition summary**: the existing `RemoCon` switch is retained,
+  with separate read-only HACS attributes for local power, mode, temperature and
+  filter-reset restrictions when group data is available and fresh. Its on state
+  alone does not mean every function on a wall or handset remote is prohibited.
 - **Equipment classification**: indoor AC units, Lossnay / air handlers and
   air-to-water units are inferred from reported attributes. Classification
   alone does not establish verified control support for every family; consult
@@ -106,6 +113,9 @@ managers who value the watchdog and a dedicated settings page often prefer the
 - **Cached controller metadata** in HACS: optional setup reads retain reported
   display model, versions and function-status fields. They do not poll metadata
   periodically, activate licences or fetch fault history.
+- **On-demand control context** in HACS: explicitly read a configured group's
+  global emergency-stop, BACnet emergency-stop and energy-saving stop flags.
+  These diagnostics add no automatic polling or gate on central HA commands.
 - **100% local**. No cloud, no account, no telemetry.
 
 ---
@@ -177,9 +187,11 @@ per group.
   container.
 - **Polling interval**: keep this sensible. 30 s is a good default; 15 s is the
   enforced floor. There is rarely value in polling a building controller faster.
-- **Remote lockout**: use the per-zone *Local remote lockout* switch to enforce
-  central control. Pair with HA automations for scheduled setback while keeping
-  occupants from overriding.
+- **Local remote restrictions**: inspect the existing switch's per-function
+  attributes before relying on a particular restriction. The switch changes
+  only `RemoCon`; it does not set the individual prohibition items or prove that
+  every local function is locked. Existing central HA commands and automations
+  are not gated by the new diagnostic context.
 - **Multiple controllers / AE-50 expansion**: add one integration entry (or one
   add-on instance) per AE-200/EW-50 controller. Each exposes its own groups.
 
@@ -216,7 +228,7 @@ The protocol exposes far more than basic climate. Currently surfaced:
 | Water outlet temp (ATW units) | `sensor` (diagnostic) |
 | Filter cleaning required | `binary_sensor` (problem) |
 | Fault | `binary_sensor` (problem) |
-| Local remote lockout | `switch` |
+| Local remote prohibition summary and per-function attributes | Existing `switch` |
 
 HACS exposes capability-based vertical vane/air-direction choices through the
 climate swing selector. Complete Lossnay ventilation and ATW controls remain
@@ -232,7 +244,8 @@ on the roadmap; library parsing alone does not establish live control support.
 | Zones found but **no names** | Names need the websocket API. Older firmware falls back to HTTP and shows `Group N`; rename in HA. |
 | A zone shows no current temperature | Its return-air thermistor is faulted/disconnected (the controller reports ~ -40 °C); the integration reports *unknown* rather than a bogus value. |
 | Add-on won't start | Check `ae200_host` is set and an MQTT broker is available. |
-| Changes revert after a moment | Something else (a schedule, the wall remote, or a BMS) is also commanding the unit. Consider the remote-lockout switch. |
+| Changes revert after a moment | Check controller schedules, local controls and other BMS commands. Inspect the relevant per-function restriction; the legacy remote switch alone does not prove that every function is prohibited. |
+| Commands appear inhibited | Explicitly inspect the selected group's control context and its freshness. Reported stop flags are diagnostic evidence; they do not establish the cause of the behaviour or physical running state. |
 | Last command shows `outcome_unknown` | Sending began, but an acknowledgement was lost. Check the subsequent state readback before deciding on another command. The integration does not repeat the write over HTTP or invent an acknowledgement. |
 
 Enable `debug` logging (add-on option, or integration logger) to see the raw

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pymelans"
-version = "0.2.0b5"
+version = "0.2.0b6"
 description = "Async client for Mitsubishi Electric MELANS / AE-200 / EW-50 centralised HVAC controllers"
 readme = "README.md"
 requires-python = ">=3.11"

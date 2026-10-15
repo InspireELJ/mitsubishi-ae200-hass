@@ -12,8 +12,10 @@ from ._pymelans import MelansError, cached_snapshot
 from .const import DOMAIN
 
 SERVICE_READ_MEMBER = "read_member"
+SERVICE_READ_CONTROL_CONTEXT = "read_control_context"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 ATTR_ADDRESS = "address"
+ATTR_GROUP_ID = "group_id"
 
 
 def _member_address(value: Any) -> int:
@@ -36,20 +38,40 @@ READ_MEMBER_SCHEMA = vol.Schema(
 )
 
 
+def _group_id(value: Any) -> int:
+    """Accept exactly one integer group without coercing booleans or floats."""
+    if isinstance(value, bool) or not (
+        isinstance(value, int) or isinstance(value, str) and value.isdecimal()
+    ):
+        raise vol.Invalid("group_id must be an integer from 1 to 50")
+    group = int(value)
+    if not 1 <= group <= 50:
+        raise vol.Invalid("group_id must be an integer from 1 to 50")
+    return group
+
+
+READ_CONTROL_CONTEXT_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): vol.All(str, vol.Length(min=1)),
+        vol.Required(ATTR_GROUP_ID): _group_id,
+    }
+)
+
+
+def _entry_coordinator(hass: HomeAssistant, entry_id: str) -> Any:
+    entry = hass.config_entries.async_get_entry(entry_id)
+    if entry is None or entry.domain != DOMAIN:
+        raise ServiceValidationError("Select an existing AE-200 configuration entry")
+    coordinator = hass.data.get(DOMAIN, {}).get(entry_id)
+    if coordinator is None:
+        raise HomeAssistantError("The selected AE-200 configuration entry is not loaded")
+    return coordinator
+
+
 def async_setup_services(hass: HomeAssistant) -> None:
     """Register once for the integration, independently of entry lifecycle."""
-    if hass.services.has_service(DOMAIN, SERVICE_READ_MEMBER):
-        return
-
     async def async_read_member(call: ServiceCall) -> ServiceResponse:
-        entry_id = call.data[ATTR_CONFIG_ENTRY_ID]
-        entry = hass.config_entries.async_get_entry(entry_id)
-        if entry is None or entry.domain != DOMAIN:
-            raise ServiceValidationError("Select an existing AE-200 configuration entry")
-        coordinator = hass.data.get(DOMAIN, {}).get(entry_id)
-        if coordinator is None:
-            raise HomeAssistantError("The selected AE-200 configuration entry is not loaded")
-
+        coordinator = _entry_coordinator(hass, call.data[ATTR_CONFIG_ENTRY_ID])
         address = call.data[ATTR_ADDRESS]
         try:
             result = await coordinator.client.async_read_member(address)
@@ -70,10 +92,40 @@ def async_setup_services(hass: HomeAssistant) -> None:
             raise HomeAssistantError("The AE-200 member read did not produce a diagnostic sample")
         return {"address": address, **member}
 
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_READ_MEMBER,
-        async_read_member,
-        schema=READ_MEMBER_SCHEMA,
-        supports_response=SupportsResponse.ONLY,
-    )
+    async def async_read_control_context(call: ServiceCall) -> ServiceResponse:
+        coordinator = _entry_coordinator(hass, call.data[ATTR_CONFIG_ENTRY_ID])
+        try:
+            context = await coordinator.client.async_read_control_context(call.data[ATTR_GROUP_ID])
+        except ValueError as err:
+            raise ServiceValidationError(str(err)) from err
+        except MelansError as err:
+            raise HomeAssistantError("The AE-200 control context read failed") from err
+        if isinstance(context, dict) and context.get("read_status") == "cooldown":
+            raise HomeAssistantError(
+                "The AE-200 control context read is cooling down. "
+                "Wait at least 15 seconds before another control context read"
+            )
+        if not isinstance(context, dict) or context.get("read_status") not in (
+            "updated", "partial", "error"
+        ):
+            raise HomeAssistantError("The AE-200 read did not produce a control context")
+        # The client builds an allowlisted diagnostic snapshot. A partial read
+        # keeps independent global/group quality so callers can use either part.
+        return context
+
+    if not hass.services.has_service(DOMAIN, SERVICE_READ_MEMBER):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_READ_MEMBER,
+            async_read_member,
+            schema=READ_MEMBER_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_READ_CONTROL_CONTEXT):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_READ_CONTROL_CONTEXT,
+            async_read_control_context,
+            schema=READ_CONTROL_CONTEXT_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
