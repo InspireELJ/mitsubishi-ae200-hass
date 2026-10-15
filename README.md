@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-This source targets the `0.2.1b4` raw member setpoint-history pilot.
+This source targets the `0.2.1b5` cached diagnostic-quality fixes.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -42,9 +42,11 @@ Live acceptance currently covers an empty list; non-empty plans remain subject
 to validation. See [today-schedule diagnostics](docs/today-schedule.md).
 
 Version `0.2.0b8` adds an explicit read-only controller-clock action with an
-independent six-field local-time snapshot and cooldown. A fresh, valid date
-can produce an offset-free local datetime; timezone, daylight-saving and clock
-drift remain unknown. Clock and schedule reads are separate samples. There is
+independent snapshot of six controller-reported calendar/clock fields and a
+cooldown. A fresh, valid date can produce an offset-free datetime; timezone,
+daylight adjustment and clock drift remain unknown. Whether the returned
+fields already include daylight adjustment is unverified; no shift is added.
+Clock and schedule reads are separate samples. There is
 no automatic query, periodic clock poll, new entity or time synchronisation.
 One minimal live Clock GET confirmed the six-field response and passed parsing
 without issues. The deployed HA action also returned a fresh successful
@@ -126,10 +128,24 @@ raw tokens and nominal half-hour position labels with unknown unit,
 aggregation and timezone. The runtime, room and setpoint history actions
 share one 15-second cooldown from completion. Separate minimal live reads
 returned 48 numeric-looking cooling strings and 48 empty heating strings;
-empty strings do not mean zero, no heating or unsupported history. HA action
-acceptance is pending. No setpoint is changed, no numeric temperature entity
+empty strings do not mean zero, no heating or unsupported history. Deployed HA
+actions for both channels returned fresh successful 48-slot snapshots matching
+cached diagnostics and the selected protocol samples exactly, including all
+empty heating strings. Identifiers, operating settings, local permissions and
+automations were preserved. No setpoint is changed, no numeric temperature entity
 is added and the ROOM_TEMP action keeps its fixed schema. See
 [member setpoint history](docs/member-setpoint-history.md).
+
+Version `0.2.1b5` corrects three cached climate diagnostic flags so unavailable,
+stale or failed data remains unknown. The existing last-command diagnostic
+also displays the four safe local restriction item expectations already
+written by the per-function action, plus bounded error type/code for recognised
+failed or uncertain commands. Error messages and connection details remain
+excluded. Unique IDs, normal climate readings and
+control mechanisms are preserved, with no extra requests or polling. Command
+expectations remain historical evidence rather than current permissions or
+physical wall-remote confirmation. See
+[diagnostic state quality](docs/diagnostic-state-quality.md).
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts

@@ -24,7 +24,7 @@ promise of support:
 
 Implementation status has a separate meaning:
 
-- **Implemented**: present in the `0.2.1b4` source. Individual device support
+- **Implemented**: present in the `0.2.1b5` source. Individual device support
   and end-to-end acceptance still apply. This is not a claim that every row has
   passed a live control test or that an installation has loaded this version.
 - **Shared library only**: protocol support exists without a complete native HA
@@ -32,7 +32,33 @@ Implementation status has a separate meaning:
 - **Planned**: a candidate requiring implementation, additional protocol
   evidence or a suitable device. It is not currently a supported HA feature.
 
-## Scope of 0.2.1b4
+## Scope of 0.2.1b5
+
+Three climate extra attributes now follow entity availability:
+`filter_sign`, `error_sign` and `local_remote_prohibited`. An unavailable
+entity, expired or failed group sample, failed coordinator update or missing
+device produces unknown values instead of exposing old cached booleans as
+current. Both entity availability and exact `fresh` group quality are required;
+fresh unrecognised tokens also remain unknown.
+
+The existing last-command diagnostic's `expected_attributes` allowlist now
+includes `DriveItem`, `ModeItem`, `SetTempItem` and `FilterItem`, only for exact
+`CHK_ON` or `CHK_OFF`. Missing, wildcard or unfamiliar values are omitted.
+These are expectations from an already-recorded command, not current effective
+permissions, physical wall-remote behaviour or an added confirmation.
+
+Only failed or `outcome_unknown` commands with a recognised error class can
+expose a bounded `error_type` and optional `error_code`. Messages, URLs,
+connection details, unknown error classes and malformed codes remain excluded.
+The native status list and command outcome rules are unchanged.
+
+Both changes read existing caches and preserve entity identifiers, normal
+climate readings, action schemas, command validation, request pacing and
+ACK/readback/uncertainty handling. They add no I/O, polling or new control
+operation. HA deployment acceptance remains pending. See
+[diagnostic state quality](diagnostic-state-quality.md).
+
+## Setpoint-history scope introduced in 0.2.1b4
 
 The response-only `ae200.read_member_setpoint_history` action requires one
 explicit entry, topology-validated IC address, strict Gregorian `date_iso`
@@ -53,8 +79,11 @@ Separate minimal live cooling and heating GETs each returned one record and
 48 raw tokens. Cooling contained numeric-looking strings; heating contained
 48 empty strings separated by 47 commas. This confirms those selected request
 shapes, not units, collection validity or measurement semantics. Empty strings
-are not zero, evidence of no heating or an unsupported endpoint. HA action
-deployment acceptance remains pending. The fixed ROOM_TEMP action schema and
+are not zero, evidence of no heating or an unsupported endpoint. Deployed HA
+acceptance passed for both channels: fresh successful 48-slot responses
+matched cached diagnostics and the selected protocol samples exactly, with
+empty heating strings preserved. Original identifiers, operating settings,
+local permissions and automations were retained. The fixed ROOM_TEMP action schema and
 existing identifiers, controls and automations are preserved.
 
 ## Room-temperature-history scope introduced in 0.2.1b3
@@ -239,8 +268,9 @@ neither flag establishes pattern activation, today's records or execution.
 
 ## Clock scope introduced in 0.2.0b8
 
-The response-only `ae200.read_controller_clock` action reads six local-clock
-fields for one explicitly selected integration entry. It retains independent
+The response-only `ae200.read_controller_clock` action reads six
+controller-reported calendar/clock fields for one explicitly selected
+integration entry. It retains independent
 attempt and successful-read times, errors and freshness, with a controller-wide
 15-second cooldown from completion. There is no setup read, periodic clock
 poll, new entity, clock write or time synchronisation.
@@ -249,7 +279,9 @@ See [controller-clock diagnostics](controller-clock.md).
 Only a fresh, successful sample representing a valid Gregorian date and time
 produces `local_datetime`, without an offset. Expired or failed samples retain
 historical raw values while the typed datetime becomes unknown. No UTC offset,
-daylight-saving rule or clock drift is inferred. One minimal live Clock GET
+daylight-saving rule or clock drift is inferred. Whether the returned fields
+already include daylight adjustment remains unverified; no shift is added.
+One minimal live Clock GET
 returned all six fields and passed strict parsing without issues; HA action
 deployment acceptance also confirmed a fresh successful action response
 matching cached diagnostics exactly. Existing entity identifiers and
@@ -407,7 +439,7 @@ behaviour and diagnostic entities described here apply to HACS.
 | Yearly patterns, season activation and schedule editing | Planned | Official season, annual-pattern and yearly-directory models. | Establish separately bounded request scopes and activation/precedence semantics. A today or single weekly-pattern sample is not the complete controller schedule. Design editing, backup and recovery separately after read-only acceptance. |
 | Member daily runtime and Thermo-ON history | On-demand raw and nullable-bucket diagnostic in 0.2.1b1; selected HA samples accepted; statistics and entities planned separately | Official IC daily graph grammar; one member/day accepted on FAN_TIME and THERMO_TIME, each with 48 zero tokens and exact fresh HA/cache agreement. | Validate non-zero data, collection quality, missing/partial/DST samples, other hardware and provenance before totals or HA statistics. Numeric zero and licence active do not establish measured idle time. |
 | IC member room-temperature history | On-demand raw-only diagnostic in 0.2.1b3; selected HA sample accepted | Fixed ROOM_TEMP request, official graph grammar and exact selected 48-token action/cache/protocol agreement; immediate cooldown accepted. | Keep unit, aggregation and timezone unknown. Validate provenance and firmware-specific semantics before numeric temperatures, averages, statistics or historical/current-state claims. |
-| IC member cooling/heating setpoint history | On-demand raw-only diagnostic in 0.2.1b4; HA action acceptance pending | One selected COOL_SET_TEMP response with 48 numeric-looking strings and one HEAT_SET_TEMP response with 48 empty strings. | Empty slots do not mean zero, no heating or no support. Validate units, aggregation and collection provenance before numeric history or statistics. History does not change or prove the current setpoint. |
+| IC member cooling/heating setpoint history | On-demand raw-only diagnostic in 0.2.1b4; both selected HA channels accepted | COOL_SET_TEMP and HEAT_SET_TEMP action/cache/protocol agreement across 48 raw slots, including 48 empty heating strings. | Empty slots do not mean zero, no heating or no support. Validate units, aggregation and collection provenance before numeric history or statistics. History does not change or prove the current setpoint. |
 | Electrical power, energy, COP and apportionment | Planned | Official energy models and documented licensed functions. | Establish installed metering and licences, data provenance, units and reset semantics. Keep measured, estimated and apportioned energy distinct. |
 | Lossnay and ventilation | Shared library only for partial parsing; complete HA control planned | Official ventilation capability flags and enum algorithms. | Obtain meaningful data from a ventilation installation. AC placeholder fields cannot establish Lossnay support. |
 | ATW, hot-water heat pumps and chillers | Partial legacy classification/sensors exist; verified device-specific HA support planned | Official separate operating modes, temperature ranges and system models. | Validate a suitable device before claiming device-family control. The existing generic climate entity is not proof of a verified hydronic mode mapping. |

@@ -10,6 +10,7 @@ import sys
 import time
 import types
 import xml.etree.ElementTree as ET
+from datetime import UTC, datetime
 from enum import IntFlag, StrEnum
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -532,6 +533,7 @@ def test_local_remote_prohibitions_do_not_relabel_central_hardware_capabilities(
         attrs={"ModeItem": "CHK_ON", "SetTempItem": "CHK_ON", "RemoCon": "PROHIBIT"},
     )
     entity = classes.AE200Climate(c, "1")
+    c.client.group_last_success["1"] = datetime.now(UTC)
 
     assert "cool" in entity.hvac_modes
     assert entity.supported_features & classes.ClimateEntityFeature.TARGET_TEMPERATURE
