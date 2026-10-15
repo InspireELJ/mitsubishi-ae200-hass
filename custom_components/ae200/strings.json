@@ -29,6 +29,22 @@
       }
     }
   },
+  "services": {
+    "read_member": {
+      "name": "Read indoor unit member",
+      "description": "Read one indoor unit address verified by this controller's cached topology and return its diagnostic sample. Member reads share a minimum 15 second interval and are never polled automatically.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Controller",
+          "description": "The AE-200 configuration entry to read from. Select it explicitly even when only one controller is configured."
+        },
+        "address": {
+          "name": "Member address",
+          "description": "One indoor unit bus address from 1 to 250, verified by the cached controller topology. This is not a group number or an IP address."
+        }
+      }
+    }
+  },
   "entity": {
     "sensor": {
       "inlet_temp": {

@@ -15,11 +15,28 @@ The client prefers websocket and falls back to HTTP automatically.
 from __future__ import annotations
 
 import asyncio
+import re
+import xml.etree.ElementTree as ET
 
 import aiohttp
 
 from . import const
-from .exceptions import MelansConnectionError
+from .exceptions import MelansConnectionError, MelansProtocolError
+
+
+def _packet_command(payload: str) -> str | None:
+    """Validate a bounded command envelope before classifying a frame."""
+    if len(payload) > 1024 * 1024 or re.search(
+        r"<!\s*(?:DOCTYPE|ENTITY)\b", payload, re.IGNORECASE
+    ):
+        raise MelansProtocolError("oversized frame or unsupported XML declaration")
+    try:
+        root = ET.fromstring(payload)
+    except ET.ParseError as exc:
+        raise MelansProtocolError("invalid websocket response XML") from exc
+    if root.tag != "Packet" or len(root.findall("./Command")) != 1:
+        raise MelansProtocolError("expected one websocket packet command")
+    return root.findtext("./Command")
 
 
 class HttpTransport:
@@ -80,10 +97,19 @@ class WebsocketTransport:
         # Imported lazily so the HTTP-only path has no hard websockets dep.
         try:
             import websockets
+            from websockets.exceptions import ConnectionClosedError, PayloadTooBig
+            from websockets.exceptions import ProtocolError as WebsocketProtocolError
             from websockets.extensions import permessage_deflate
         except ImportError as exc:  # pragma: no cover
             raise MelansConnectionError("websockets library not installed") from exc
 
+        command = _packet_command(payload)
+        expected = {
+            "getRequest": {"getResponse", "getErrorResponse"},
+            "setRequest": {"setResponse", "setErrorResponse"},
+        }.get(command)
+        if expected is None:
+            raise MelansProtocolError("unsupported websocket request command")
         try:
             async with websockets.connect(
                 self._uri,
@@ -94,9 +120,39 @@ class WebsocketTransport:
                 close_timeout=self._timeout,
             ) as ws:
                 await ws.send(payload)
-                data = await asyncio.wait_for(ws.recv(), timeout=self._timeout)
-                return data.decode("utf-8") if isinstance(data, bytes) else data
-        except Exception as exc:  # noqa: BLE001 - websockets raises many types; normalise
+                # A controller may push a notification before this request's
+                # response, even on a newly opened socket. Do not use that
+                # partial notification as a read sample or write acknowledgement.
+                # One deadline and a frame cap bound a noisy notification stream.
+                async with asyncio.timeout(self._timeout):
+                    for _ in range(33):
+                        data = await ws.recv()
+                        try:
+                            response = data.decode("utf-8") if isinstance(data, bytes) else data
+                        except UnicodeDecodeError as exc:
+                            raise MelansProtocolError("invalid websocket response encoding") from exc
+                        response_command = _packet_command(response)
+                        if response_command in expected:
+                            return response
+                        if response_command not in {
+                            "notifyRequest", "KeepAlive"
+                        }:
+                            raise MelansProtocolError("unexpected websocket response command")
+                    raise MelansProtocolError("too many notifications before response")
+        except MelansProtocolError:
+            raise
+        except (PayloadTooBig, WebsocketProtocolError) as exc:
+            raise MelansProtocolError("invalid websocket frame") from exc
+        except ConnectionClosedError as exc:
+            # The websocket library rejects oversized or malformed frames before
+            # recv returns. Do not bypass that rejection by repeating via HTTP.
+            if any(
+                close is not None and close.code in (1002, 1007, 1009)
+                for close in (exc.sent, exc.rcvd)
+            ):
+                raise MelansProtocolError("websocket rejected response frame") from exc
+            raise MelansConnectionError(f"websocket connection closed: {exc}") from exc
+        except Exception as exc:
             raise MelansConnectionError(f"websocket request failed: {exc}") from exc
 
     async def close(self) -> None:  # symmetry with HttpTransport

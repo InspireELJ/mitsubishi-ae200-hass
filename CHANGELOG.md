@@ -3,6 +3,33 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0b4] - 2026-10-16
+
+### Added
+- One optional configured-membership directory read after the first successful
+  HA group refresh. Preserve all members without replacing existing entities.
+- Separate, bounded Address parsing and cached member diagnostics. The
+  `ae200.read_member` action reads one explicitly selected configured indoor
+  member, with a controller-wide 15-second cooldown and no automatic member poll.
+- Membership and member data have their own sample times, errors and quality.
+  Optional failures do not change group-state freshness or controller health.
+
+### Fixed
+- Wait for the actual websocket get/set response when unsolicited notifications
+  arrive first. Ignore bounded notifications and KeepAlive frames under one
+  response deadline, without resending the request or treating a notification
+  as a complete sample or command acknowledgement.
+
+### Validation scope
+- Live configured-member directory and a single indoor-member status read.
+- A control-assisted fan-only test observed an unsolicited FanStatus notification
+  before the expected response. The corrected transport received the complete
+  getResponse with FanStatus ON and ThermoStatus OFF; the original group settings
+  and OFF state were restored and read back.
+- The pilot firmware rejected DefrostStatus as an unknown attribute. It is not
+  requested by the new action. AlarmCode remains an uninterpreted string; no
+  compressor operation, energy measurement or whole-group hvac_action is inferred.
+
 ## [0.2.0b3] - 2026-10-16
 
 ### Added

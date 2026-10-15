@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-The company `main` branch contains the `0.2.0b3` capability pilot.
+The company `main` branch contains the `0.2.0b4` membership diagnostics pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -12,11 +12,15 @@ per-group freshness, controller health, checked command acknowledgements,
 cached raw-field diagnostics and a self-contained HACS bundle. Zero humidity
 is treated as an unverified value rather than a measurement.
 
-Version `0.2.0b3` adds a bounded capability query, per-group mode and fan choices,
+Version `0.2.0b3` added a bounded capability query, per-group mode and fan choices,
 vertical vane control, reported temperature precision and limits, atomic
 mode/power commands and cached command-readback diagnostics. See the
 [capability matrix and development scope](docs/capabilities.md) for verified
 behaviour, equipment-family limits and the remaining expansion work.
+
+Version `0.2.0b4` adds configured-member topology, an explicitly targeted
+read-only member diagnostic action, independent member freshness and websocket
+notification/response separation. See [member diagnostics](docs/member-diagnostics.md).
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts
