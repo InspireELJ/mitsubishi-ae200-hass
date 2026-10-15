@@ -3,8 +3,18 @@
 from __future__ import annotations
 
 import pytest
-from pymelans.daily_trend import member_day_selector
+from pymelans.daily_trend import (
+    RawDailyTrendIssue,
+    RawDailyTrendSlot,
+    _raw_series,
+    member_day_selector,
+)
 from pymelans.exceptions import MelansProtocolError
+from pymelans.member_temperature_history import (
+    TemperatureHistoryIssue,
+    TemperatureHistorySlot,
+    parse_member_temperature_history,
+)
 
 from pymelans import member_runtime
 
@@ -59,3 +69,46 @@ def test_runtime_error_context_is_preserved_after_shared_directory_extraction(pa
             payload, expected_address="4", expected_date="2024-02-29", expected_data_name="FAN_TIME",
         )
     assert str(caught.value) == message
+
+
+def room_packet(raw):
+    return (
+        '<Packet><Command>getResponse</Command><DatabaseManager><EnergyManagement>'
+        '<IcTrendDList Address="4" Year="2024" Month="2" Day="29" DataName="ROOM_TEMP">'
+        f'<IcTrendDRecord RoomTempData="{raw}" /></IcTrendDList>'
+        '</EnergyManagement></DatabaseManager></Packet>'
+    )
+
+
+def test_raw_core_is_neutral_while_room_keeps_existing_public_slot_class_and_module():
+    selector = {"Address": "4", "Year": "2024", "Month": "2", "Day": "29", "DataName": "ROOM_TEMP"}
+    payload = room_packet("," * 47)
+    shared = _raw_series(payload, selector, selected_field="RoomTempData", context="member-temperature-history")
+    room = parse_member_temperature_history(payload, expected_address="4", expected_date="2024-02-29")
+    assert shared.raw_tokens == room.raw_tokens == ("",) * 48
+    assert type(shared.slots[0]) is RawDailyTrendSlot
+    assert type(room.slots[0]) is TemperatureHistorySlot
+    assert TemperatureHistorySlot.__module__ == "pymelans.member_temperature_history"
+    assert repr(room.slots[0]) == "TemperatureHistorySlot(index=0, start_time='00:00', end_time='00:30')"
+    assert [(slot.index, slot.start_time, slot.end_time, slot.raw_token) for slot in shared.slots] == [
+        (slot.index, slot.start_time, slot.end_time, slot.raw_token) for slot in room.slots
+    ]
+
+
+def test_room_issue_class_identity_context_and_shape_survive_shared_raw_core():
+    selector = {"Address": "4", "Year": "2024", "Month": "2", "Day": "29", "DataName": "ROOM_TEMP"}
+    payload = room_packet("")
+    shared = _raw_series(payload, selector, selected_field="RoomTempData", context="member-temperature-history")
+    room = parse_member_temperature_history(payload, expected_address="4", expected_date="2024-02-29")
+    assert type(shared.issues[0]) is RawDailyTrendIssue
+    assert type(room.issues[0]) is TemperatureHistoryIssue
+    assert TemperatureHistoryIssue.__module__ == "pymelans.member_temperature_history"
+    assert room.issues == (TemperatureHistoryIssue("RoomTempData", "unexpected_token_count"),)
+    assert room.raw_data == "" and room.raw_tokens == ("",) and room.slots == ()
+    assert [(issue.key, issue.kind) for issue in shared.issues] == [(issue.key, issue.kind) for issue in room.issues]
+    with pytest.raises(MelansProtocolError) as caught:
+        parse_member_temperature_history(
+            payload.replace('DataName="ROOM_TEMP"', 'DataName="COOL_SET_TEMP"'),
+            expected_address="4", expected_date="2024-02-29",
+        )
+    assert str(caught.value) == "member-temperature-history response selector mismatch"

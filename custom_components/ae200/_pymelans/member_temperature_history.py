@@ -9,12 +9,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .daily_trend import BUCKET_COUNT as BUCKET_COUNT
+from .daily_trend import BUCKET_MINUTES as BUCKET_MINUTES
 from .daily_trend import (
-    BUCKET_COUNT,
-    BUCKET_MINUTES,
     _build_request,
-    _directory,
-    _time_label,
+    _raw_series,
     member_day_selector,
 )
 
@@ -69,25 +68,15 @@ def parse_member_temperature_history(
     truncation, runtime alias, unit conversion or aggregate is performed.
     """
     selector = _selector(expected_address, expected_date)
-    directory = _directory(payload, selector, context="member-temperature-history")
-    records = list(directory)
-    raw_data = records[0].get(DATA_FIELD) if records else None
-    raw_tokens = tuple(raw_data.split(",")) if raw_data is not None else ()
-    issues: list[TemperatureHistoryIssue] = []
-    slots: list[TemperatureHistorySlot] = []
-    if not records:
-        issues.append(TemperatureHistoryIssue("record", "missing_record"))
-    elif raw_data is None:
-        issues.append(TemperatureHistoryIssue(DATA_FIELD, "missing_data"))
-    elif len(raw_tokens) != BUCKET_COUNT:
-        issues.append(TemperatureHistoryIssue(DATA_FIELD, "unexpected_token_count"))
-    else:
-        for index, token in enumerate(raw_tokens):
-            start = index * BUCKET_MINUTES
-            slots.append(TemperatureHistorySlot(
-                index, _time_label(start), _time_label(start + BUCKET_MINUTES), token,
-            ))
+    raw = _raw_series(
+        payload, selector, selected_field=DATA_FIELD, context="member-temperature-history",
+    )
+    # Keep the existing public ROOM classes and their defining module while
+    # sharing structural/raw parsing with other explicit daily channels.
     return MemberTemperatureHistory(
-        selector["Address"], expected_date, len(records),
-        raw_data, raw_tokens, tuple(slots), tuple(issues),
+        selector["Address"], expected_date, raw.record_count, raw.raw_data, raw.raw_tokens,
+        tuple(TemperatureHistorySlot(
+            slot.index, slot.start_time, slot.end_time, slot.raw_token,
+        ) for slot in raw.slots),
+        tuple(TemperatureHistoryIssue(issue.key, issue.kind) for issue in raw.issues),
     )

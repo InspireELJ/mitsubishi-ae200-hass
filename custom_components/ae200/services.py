@@ -12,6 +12,7 @@ from ._pymelans import (
     MelansError,
     cached_snapshot,
     member_runtime,
+    member_setpoint_history,
     member_temperature_history,
 )
 from .const import DOMAIN
@@ -24,6 +25,7 @@ SERVICE_READ_WEEKLY_PATTERN = "read_weekly_pattern"
 SERVICE_SET_LOCAL_RESTRICTIONS = "set_local_restrictions"
 SERVICE_READ_MEMBER_RUNTIME = "read_member_runtime"
 SERVICE_READ_MEMBER_TEMPERATURE_HISTORY = "read_member_temperature_history"
+SERVICE_READ_MEMBER_SETPOINT_HISTORY = "read_member_setpoint_history"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 ATTR_ADDRESS = "address"
 ATTR_GROUP_ID = "group_id"
@@ -175,6 +177,28 @@ READ_MEMBER_TEMPERATURE_HISTORY_SCHEMA = vol.All(
         vol.Required(ATTR_DATE_ISO): object,
     }),
     _temperature_history_selector,
+)
+
+
+def _setpoint_history_selector(data: dict[str, Any]) -> dict[str, Any]:
+    """Validate one member/day and one exact cooling or heating history name."""
+    try:
+        selector = member_setpoint_history._selector(
+            data[ATTR_ADDRESS], data[ATTR_DATE_ISO], data[ATTR_DATA_NAME]
+        )
+    except ValueError as err:
+        raise vol.Invalid(str(err)) from err
+    return {**data, ATTR_ADDRESS: int(selector["Address"])}
+
+
+READ_MEMBER_SETPOINT_HISTORY_SCHEMA = vol.All(
+    vol.Schema({
+        vol.Required(ATTR_CONFIG_ENTRY_ID): vol.All(str, vol.Length(min=1)),
+        vol.Required(ATTR_ADDRESS): object,
+        vol.Required(ATTR_DATE_ISO): object,
+        vol.Required(ATTR_DATA_NAME): object,
+    }),
+    _setpoint_history_selector,
 )
 
 
@@ -357,6 +381,29 @@ def async_setup_services(hass: HomeAssistant) -> None:
         # aggregation, unit or current-state inference is added by the action.
         return history
 
+    async def async_read_member_setpoint_history(call: ServiceCall) -> ServiceResponse:
+        coordinator = _entry_coordinator(hass, call.data[ATTR_CONFIG_ENTRY_ID])
+        try:
+            history = await coordinator.client.async_read_member_setpoint_history(
+                call.data[ATTR_ADDRESS], call.data[ATTR_DATE_ISO], call.data[ATTR_DATA_NAME]
+            )
+        except ValueError as err:
+            raise ServiceValidationError(str(err)) from err
+        except MelansError as err:
+            raise HomeAssistantError("The AE-200 member setpoint history read failed") from err
+        if isinstance(history, dict) and history.get("read_status") == "cooldown":
+            raise HomeAssistantError(
+                "The AE-200 member setpoint history read is cooling down. "
+                "Wait at least 15 seconds before another member history read"
+            )
+        if not isinstance(history, dict) or history.get("read_status") not in ("updated", "error"):
+            raise HomeAssistantError(
+                "The AE-200 read did not produce a member setpoint history sample"
+            )
+        # A saved series is raw controller evidence. Empty slots are not zero
+        # or an operating-state claim, and this action never changes a setpoint.
+        return history
+
     if not hass.services.has_service(DOMAIN, SERVICE_READ_MEMBER):
         hass.services.async_register(
             DOMAIN,
@@ -419,5 +466,13 @@ def async_setup_services(hass: HomeAssistant) -> None:
             SERVICE_READ_MEMBER_TEMPERATURE_HISTORY,
             async_read_member_temperature_history,
             schema=READ_MEMBER_TEMPERATURE_HISTORY_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_READ_MEMBER_SETPOINT_HISTORY):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_READ_MEMBER_SETPOINT_HISTORY,
+            async_read_member_setpoint_history,
+            schema=READ_MEMBER_SETPOINT_HISTORY_SCHEMA,
             supports_response=SupportsResponse.ONLY,
         )

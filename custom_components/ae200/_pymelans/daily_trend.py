@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
 from datetime import date
 
 from .exceptions import MelansProtocolError
@@ -20,6 +21,29 @@ BUCKET_COUNT = 48
 BUCKET_MINUTES = 30
 _XML_DECL = '<?xml version="1.0" encoding="UTF-8"?>'
 _XML_WHITESPACE = re.compile(r"[ \t\r\n]*")
+
+
+@dataclass(frozen=True)
+class RawDailyTrendIssue:
+    key: str
+    kind: str
+
+
+@dataclass(frozen=True)
+class RawDailyTrendSlot:
+    index: int
+    start_time: str
+    end_time: str
+    raw_token: str = field(repr=False)
+
+
+@dataclass(frozen=True)
+class RawDailyTrendSeries:
+    record_count: int
+    raw_data: str | None = field(repr=False)
+    raw_tokens: tuple[str, ...] = field(repr=False)
+    slots: tuple[RawDailyTrendSlot, ...]
+    issues: tuple[RawDailyTrendIssue, ...] = ()
 
 
 def member_day_selector(address: str | int, date_iso: str) -> dict[str, str]:
@@ -87,3 +111,33 @@ def _directory(payload: str, selector: dict[str, str], *, context: str) -> ET.El
 def _time_label(minutes: int) -> str:
     """Format an interval boundary without timezone or sampling assertions."""
     return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def _raw_series(
+    payload: str, selector: dict[str, str], *, selected_field: str, context: str,
+) -> RawDailyTrendSeries:
+    """Retain one raw field only after checking the untouched original payload.
+
+    Callers supply a fixed allowlisted channel/field pair. All 48-token shapes,
+    including 48 blanks, receive graph-position labels without numeric or unit
+    interpretation. Other counts are retained without padding or truncation.
+    """
+    directory = _directory(payload, selector, context=context)
+    records = list(directory)
+    raw_data = records[0].get(selected_field) if records else None
+    raw_tokens = tuple(raw_data.split(",")) if raw_data is not None else ()
+    issues: list[RawDailyTrendIssue] = []
+    slots: list[RawDailyTrendSlot] = []
+    if not records:
+        issues.append(RawDailyTrendIssue("record", "missing_record"))
+    elif raw_data is None:
+        issues.append(RawDailyTrendIssue(selected_field, "missing_data"))
+    elif len(raw_tokens) != BUCKET_COUNT:
+        issues.append(RawDailyTrendIssue(selected_field, "unexpected_token_count"))
+    else:
+        for index, token in enumerate(raw_tokens):
+            start = index * BUCKET_MINUTES
+            slots.append(RawDailyTrendSlot(
+                index, _time_label(start), _time_label(start + BUCKET_MINUTES), token,
+            ))
+    return RawDailyTrendSeries(len(records), raw_data, raw_tokens, tuple(slots), tuple(issues))

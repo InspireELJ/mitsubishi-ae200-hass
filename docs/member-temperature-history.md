@@ -3,7 +3,8 @@
 Version `0.2.1b3` adds the response-only
 `ae200.read_member_temperature_history` action. It explicitly reads one
 topology-validated IC member and one calendar date, with the data name fixed
-to `ROOM_TEMP`. HA action deployment acceptance remains pending.
+to `ROOM_TEMP`. Deployed HA acceptance has passed for one selected member/day
+and an immediate-repeat cooldown check.
 
 The diagnostic retains raw strings. It does not publish Celsius values,
 averages, totals, temperature entities or statistics. `unit`, `aggregation`
@@ -119,7 +120,7 @@ or schedule sample is inferred.
 
 ## Cache, cooldown and failure isolation
 
-Room-temperature and runtime-history actions share a controller-wide lock
+Room-temperature, runtime and setpoint-history actions share a controller-wide lock
 and a 15-second cooldown measured from completion across members, days and
 their channels. Normal request pacing remains in force. There is no startup
 history read, periodic poll, automatic query or new entity.
@@ -153,9 +154,17 @@ request and response shape, rather than units, aggregation, collection
 validity or cross-firmware measurement support. Public documentation retains
 no private address, selected site date, raw values or inventory.
 
-HA action deployment acceptance is pending. Numeric historical temperatures,
+The deployed HA action returned a fresh successful snapshot with 48 raw tokens
+and positions matching both cached diagnostics and the selected protocol
+sample exactly. Unit, aggregation and timezone remained unknown. An immediate
+repeat raised the expected cooldown error without changing the cached attempt
+or success time. Original entity identifiers, operating settings, local
+permissions and the enabled scheduled automation were preserved.
+
+Numeric historical temperatures,
 statistics, means, minima/maxima, missing-data rules, sampling semantics and
 DST handling require separate evidence and implementation. The existing
 current-temperature entity, control paths, identifiers and automations are
 preserved. See [runtime history](member-runtime.md) for the separate minute
-channel and [capability boundaries](capabilities.md) for the broader scope.
+channel, [setpoint history](member-setpoint-history.md) for cooling/heating raw
+series, and [capability boundaries](capabilities.md) for the broader scope.

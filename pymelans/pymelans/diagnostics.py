@@ -154,6 +154,7 @@ def cached_snapshot(client: MelansClient) -> dict[str, Any]:
         "weekly_patterns": client.weekly_pattern_snapshot(),
         "member_runtimes": client.member_runtime_snapshot(),
         "member_temperature_histories": client.member_temperature_history_snapshot(),
+        "member_setpoint_histories": client.member_setpoint_history_snapshot(),
         "controller_clock": client.controller_clock_snapshot(),
         "controller_metadata": {
             "attempted": client._metadata_attempted,
