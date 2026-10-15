@@ -11,11 +11,10 @@ from homeassistant.components.climate import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from pymelans import const as mc
-
+from ._pymelans import const as mc
 from .const import DOMAIN
 from .coordinator import AE200Coordinator
 from .entity import AE200Entity
@@ -33,6 +32,8 @@ _HA_TO_MODE = {v: k for k, v in _MODE_TO_HA.items()}
 _FAN_TO_HA = {
     mc.FAN_LOW: "low",
     mc.FAN_MID: "medium",
+    mc.FAN_MID1: "medium_1",
+    mc.FAN_MID2: "medium_2",
     mc.FAN_HIGH: "high",
     mc.FAN_AUTO: "auto",
 }
@@ -67,7 +68,7 @@ class AE200Climate(AE200Entity, ClimateEntity):
         HVACMode.DRY,
         HVACMode.HEAT_COOL,
     ]
-    _attr_fan_modes = ["auto", "low", "medium", "high"]
+    _attr_fan_modes = ["auto", "low", "medium", "medium_1", "medium_2", "high"]
     _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(self, coordinator: AE200Coordinator, group_id: str) -> None:
@@ -89,11 +90,13 @@ class AE200Climate(AE200Entity, ClimateEntity):
         return self.device.target_temperature if self.device else None
 
     @property
-    def hvac_mode(self) -> HVACMode:
+    def hvac_mode(self) -> HVACMode | None:
         dev = self.device
-        if not dev or not dev.is_on:
+        if not dev or dev.is_on is None:
+            return None
+        if not dev.is_on:
             return HVACMode.OFF
-        return _MODE_TO_HA.get(dev.mode or "", HVACMode.OFF)
+        return _MODE_TO_HA.get(dev.mode or "")
 
     @property
     def fan_mode(self) -> str | None:
@@ -114,6 +117,8 @@ class AE200Climate(AE200Entity, ClimateEntity):
             "error_sign": dev.error_sign,
             "local_remote_prohibited": dev.local_remote_prohibited,
             "transport": self.coordinator.client.transport_name,
+            "data_quality": self.coordinator.client.group_quality(self._group_id),
+            "fan_speed_raw": dev.fan_speed,
         }
 
     async def async_set_temperature(self, **kwargs: Any) -> None:

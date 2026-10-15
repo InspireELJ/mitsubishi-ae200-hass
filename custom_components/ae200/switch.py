@@ -25,9 +25,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: AE200Coordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
-        AE200RemoteLockSwitch(coordinator, gid) for gid in coordinator.data
-    )
+    async_add_entities(AE200RemoteLockSwitch(coordinator, gid) for gid in coordinator.data)
 
 
 class AE200RemoteLockSwitch(AE200Entity, SwitchEntity):

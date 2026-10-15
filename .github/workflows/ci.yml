@@ -2,8 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feat/**']
   pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -19,9 +23,24 @@ jobs:
           pip install ./pymelans
           pip install pytest pytest-asyncio ruff
       - name: Lint
-        run: ruff check pymelans custom_components addon/rootfs/usr/bin || true
+        run: ruff check --config ruff.toml pymelans custom_components addon/rootfs/usr/bin scripts tests
+      - name: Verify bundled library
+        run: python scripts/sync_ha_library.py --check
+      - name: Compile
+        run: python -m compileall -q pymelans custom_components addon/rootfs/usr/bin scripts
       - name: Test
         run: PYTHONPATH=pymelans pytest tests/ -q -c /dev/null
+      - name: Test read-only browser probe
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ae200-js-tests" --no-audit --no-fund @xmldom/xmldom@0.9.12
+          AE200_QA_XMLDOM="$RUNNER_TEMP/ae200-js-tests/node_modules/@xmldom/xmldom" node --test tests/test_browser_probe.cjs
+      - name: Build pilot archive
+        run: python scripts/build_release.py
+      - name: Upload pilot archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ae200-pilot
+          path: dist/*
 
   hassfest:
     runs-on: ubuntu-latest
@@ -38,3 +57,4 @@ jobs:
         with:
           category: integration
           ignore: brands
+          comment: false

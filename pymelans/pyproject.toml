@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pymelans"
-version = "0.1.0"
+version = "0.2.0b2"
 description = "Async client for Mitsubishi Electric MELANS / AE-200 / EW-50 centralised HVAC controllers"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,8 +24,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/GitDakky/mitsubishi-ae200-hass"
-Issues = "https://github.com/GitDakky/mitsubishi-ae200-hass/issues"
+Homepage = "https://github.com/InspireELJ/mitsubishi-ae200-hass"
+Issues = "https://github.com/InspireELJ/mitsubishi-ae200-hass/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.5"]

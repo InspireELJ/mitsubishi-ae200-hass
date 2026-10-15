@@ -25,10 +25,15 @@ from .exceptions import MelansConnectionError
 class HttpTransport:
     """Plain HTTP servlet transport (universal, no group names)."""
 
-    def __init__(self, host: str, *, port: int = const.DEFAULT_PORT,
-                 path: str = const.DEFAULT_HTTP_PATH,
-                 session: aiohttp.ClientSession | None = None,
-                 timeout: int = const.REQUEST_TIMEOUT):
+    def __init__(
+        self,
+        host: str,
+        *,
+        port: int = const.DEFAULT_PORT,
+        path: str = const.DEFAULT_HTTP_PATH,
+        session: aiohttp.ClientSession | None = None,
+        timeout: int = const.REQUEST_TIMEOUT,
+    ):
         self._url = f"http://{host}:{port}{path}"
         self._session = session
         self._own_session = session is None
@@ -39,12 +44,14 @@ class HttpTransport:
             self._session = aiohttp.ClientSession()
         try:
             async with self._session.post(
-                self._url, data=payload.encode("utf-8"),
-                headers={"Content-Type": "text/xml"}, timeout=self._timeout,
+                self._url,
+                data=payload.encode("utf-8"),
+                headers={"Content-Type": "text/xml"},
+                timeout=self._timeout,
             ) as resp:
                 resp.raise_for_status()
                 return await resp.text()
-        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+        except (TimeoutError, aiohttp.ClientError) as exc:
             raise MelansConnectionError(f"HTTP request failed: {exc}") from exc
 
     async def close(self) -> None:
@@ -56,9 +63,14 @@ class HttpTransport:
 class WebsocketTransport:
     """Websocket transport (group names + full attribute set)."""
 
-    def __init__(self, host: str, *, port: int = const.DEFAULT_PORT,
-                 path: str = const.DEFAULT_WS_PATH,
-                 timeout: int = const.REQUEST_TIMEOUT):
+    def __init__(
+        self,
+        host: str,
+        *,
+        port: int = const.DEFAULT_PORT,
+        path: str = const.DEFAULT_WS_PATH,
+        timeout: int = const.REQUEST_TIMEOUT,
+    ):
         self._host = host
         self._uri = f"ws://{host}:{port}{path}"
         self._origin = f"http://{host}:{port}" if port != 80 else f"http://{host}"

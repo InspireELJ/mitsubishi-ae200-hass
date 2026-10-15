@@ -8,6 +8,8 @@ is what makes the integration generic across the Mitsubishi device family.
 
 from __future__ import annotations
 
+import math
+
 from . import const
 
 
@@ -18,7 +20,15 @@ def _to_float(value: str | None) -> float | None:
         f = float(value)
     except (TypeError, ValueError):
         return None
-    return f
+    return f if math.isfinite(f) else None
+
+
+def _flag(value: str | None, on: str, off: str) -> bool | None:
+    if value == on:
+        return True
+    if value == off:
+        return False
+    return None
 
 
 class MelansDevice:
@@ -36,6 +46,10 @@ class MelansDevice:
 
     def update(self, attrs: dict[str, str]) -> None:
         self._attrs = attrs
+
+    def raw_attributes(self) -> dict[str, str]:
+        """Return a copy for bounded diagnostics, never a mutable cache reference."""
+        return dict(self._attrs)
 
     # -- classification ---------------------------------------------------
     def _has_value(self, *keys: str) -> bool:
@@ -81,8 +95,8 @@ class MelansDevice:
 
     # -- core climate -----------------------------------------------------
     @property
-    def is_on(self) -> bool:
-        return self.raw("Drive") == const.DRIVE_ON
+    def is_on(self) -> bool | None:
+        return _flag(self.raw("Drive"), const.DRIVE_ON, const.DRIVE_OFF)
 
     @property
     def mode(self) -> str | None:
@@ -109,7 +123,17 @@ class MelansDevice:
 
     @property
     def current_humidity(self) -> float | None:
-        return _to_float(self.raw("RoomHumidity") or self.raw("InletHumidity"))
+        # Zero is returned as a placeholder by AC groups without a verified
+        # humidity measurement. Preserve it in diagnostics, not statistics.
+        for key in ("RoomHumidity", "InletHumidity"):
+            value = _to_float(self.raw(key))
+            if value is not None and 0 < value <= 100:
+                return value
+        return None
+
+    @property
+    def has_humidity_attribute(self) -> bool:
+        return self._has_value("RoomHumidity", "InletHumidity")
 
     # -- ventilation (Lossnay / air handler) ------------------------------
     @property
@@ -135,16 +159,16 @@ class MelansDevice:
 
     # -- diagnostics / building-manager flags -----------------------------
     @property
-    def filter_sign(self) -> bool:
-        return self.raw("FilterSign") == const.SIGN_ON
+    def filter_sign(self) -> bool | None:
+        return _flag(self.raw("FilterSign"), const.SIGN_ON, const.SIGN_OFF)
 
     @property
-    def error_sign(self) -> bool:
-        return self.raw("ErrorSign") == const.SIGN_ON
+    def error_sign(self) -> bool | None:
+        return _flag(self.raw("ErrorSign"), const.SIGN_ON, const.SIGN_OFF)
 
     @property
-    def local_remote_prohibited(self) -> bool:
-        return self.raw("RemoCon") == const.REMOCON_PROHIBIT
+    def local_remote_prohibited(self) -> bool | None:
+        return _flag(self.raw("RemoCon"), const.REMOCON_PROHIBIT, const.REMOCON_PERMIT)
 
     # -- supported-feature hints from per-item PROHIBIT flags -------------
     @property

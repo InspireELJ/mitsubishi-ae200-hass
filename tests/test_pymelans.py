@@ -7,8 +7,6 @@ firmware c.2021) so CI exercises the actual wire format without hardware.
 from __future__ import annotations
 
 import pytest
-
-from pymelans import const as mc
 from pymelans.device import MelansDevice
 from pymelans.exceptions import MelansProtocolError
 from pymelans.protocol import (
@@ -17,6 +15,8 @@ from pymelans.protocol import (
     parse_group_list,
     parse_state,
 )
+
+from pymelans import const as mc
 
 GROUP_LIST_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <Packet><Command>getResponse</Command><DatabaseManager><ControlGroup><MnetList>
@@ -46,7 +46,10 @@ ERROR_XML = """<?xml version="1.0" encoding="UTF-8"?>
 def test_parse_group_list():
     groups = parse_group_list(GROUP_LIST_XML)
     assert {g["id"]: g["name"] for g in groups} == {
-        "1": "BEDROOM", "2": "FAMILY ROOM", "3": "KITCHEN", "4": "GYM",
+        "1": "BEDROOM",
+        "2": "FAMILY ROOM",
+        "3": "KITCHEN",
+        "4": "GYM",
     }
 
 
