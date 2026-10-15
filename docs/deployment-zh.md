@@ -1,6 +1,6 @@
 # 内部试点版本部署与回退
 
-本分支版本：`0.2.0b2`。适用于 Home Assistant Core 2025.12 及更新版本；首个现场目标使用 Core 2026.10.1。
+本分支版本：`0.2.0b3`。适用于 Home Assistant Core 2025.12 及更新版本；首个现场目标使用 Core 2026.10.1。
 
 这是现场验收前的 beta。已测试协议、失败处理和打包；真实控制器与真实 HA 的端到端验收仍需部署后完成。该版本不新增温控、清洁或定时关机策略。
 
@@ -27,7 +27,7 @@
 1. 在 HA 做一次正常备份，并导出当前空调实体清单。保留现有一键关闭、清洁保护和强制关闭规则。
 2. 下载这个开发分支的 ZIP：
    `https://github.com/InspireELJ/mitsubishi-ae200-hass/archive/refs/heads/feat/inspire-monitoring-pilot.zip`
-   也可以使用 CI 构建产物中的 `ae200-0.2.0b2.zip`；两者都只安装其中的 `custom_components/ae200`。
+   也可以使用 CI 构建产物中的 `ae200-0.2.0b3.zip`；两者都只安装其中的 `custom_components/ae200`。
 3. 解压到电脑上的一个临时目录。用 Samba、Studio Code Server 或现有文件传输方式，将文件放到 HA 配置目录的临时位置，例如：
 
    ```text
@@ -59,7 +59,7 @@
 ## 部署后的验收
 
 1. 设置 → 设备与服务 → Mitsubishi AE-200 / EW-50：原有控制器条目应直接加载。不要重新添加或删除条目。
-2. 确认版本为 `0.2.0b2`；检查原有 climate 实体名称、数量、房间分配及自动化目标没有变化。
+2. 确认版本为 `0.2.0b3`；检查原有 climate 实体名称、数量、房间分配及自动化目标没有变化。
 3. 控制器设备页应出现 Controller status / Last successful read；分组设备页增加 Communication problem。
 4. 等待至少两个轮询周期。默认 30 秒，可在选项中调整，最小 15 秒。诊断中的 last_successful_read 才表示一次真实成功读取；HA last_updated 不具有相同含义。
 5. 在集成条目的菜单选择 Download diagnostics。文件应包含 `inspire-ae200-ha-diagnostics-v1`，各组的 raw_attributes、quality 和最后成功读取时间。
@@ -95,7 +95,7 @@ PYTHONPATH=pymelans pytest tests/ -q -c /dev/null
 python scripts/build_release.py
 ```
 
-`dist/ae200-0.2.0b2.zip` 及其 SHA-256 文件是构建产物，不提交到源码仓库。HACS 迁移时应先保存当前文件，再仅调整 HACS 中的仓库下载来源；业务集成条目保持不动。本文不让 HACS 和手动安装器同时管理更新。
+`dist/ae200-0.2.0b3.zip` 及其 SHA-256 文件是构建产物，不提交到源码仓库。HACS 迁移时应先保存当前文件，再仅调整 HACS 中的仓库下载来源；业务集成条目保持不动。本文不让 HACS 和手动安装器同时管理更新。
 
 ### 公司 fork 的 HACS 检查
 

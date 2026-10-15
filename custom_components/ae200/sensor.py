@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -89,6 +90,7 @@ async def async_setup_entry(
         [
             AE200ControllerStatus(coordinator),
             AE200LastSuccessfulRead(coordinator),
+            AE200LastCommandStatus(coordinator),
         ]
     )
 
@@ -146,3 +148,83 @@ class AE200LastSuccessfulRead(AE200ControllerEntity, SensorEntity):
     @property
     def native_value(self) -> datetime | None:
         return self.coordinator.client.last_success
+
+
+class AE200LastCommandStatus(AE200ControllerEntity, SensorEntity):
+    """Report acknowledgement/readback progress without sending a request."""
+
+    _attr_translation_key = "last_command_status"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = [
+        "unknown",
+        "pending",
+        "accepted_unconfirmed",
+        "not_yet_confirmed",
+        "confirmed",
+        "failed",
+    ]
+
+    def __init__(self, coordinator: AE200Coordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.host}_last_command_status"
+
+    @property
+    def native_value(self) -> str:
+        command = self.coordinator.client.last_command
+        status = command.get("status") if isinstance(command, dict) else None
+        return status if status in self._attr_options else "unknown"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Only publish known command fields, never connection/error details."""
+        command = self.coordinator.client.last_command
+        if not isinstance(command, dict):
+            return {}
+        result = {}
+        group_id = command.get("group_id")
+        if (
+            isinstance(group_id, str)
+            and len(group_id) <= 2
+            and group_id.isdecimal()
+            and 1 <= int(group_id) <= mc.MAX_GROUPS
+        ):
+            result["group_id"] = group_id
+        timestamp = command.get("at")
+        if isinstance(timestamp, str):
+            try:
+                parsed = datetime.fromisoformat(timestamp)
+            except ValueError:
+                pass
+            else:
+                if parsed.tzinfo is not None:
+                    result["at"] = parsed.isoformat()
+
+        expected = command.get("attributes")
+        if not isinstance(expected, dict):
+            return result
+        values = {
+            "Drive": (mc.DRIVE_ON, mc.DRIVE_OFF),
+            "Mode": mc.ALL_MODES,
+            "FanSpeed": mc.ALL_FAN_SPEEDS,
+            "AirDirection": mc.AIR_DIR_VALUES,
+            "RemoCon": (mc.REMOCON_PERMIT, mc.REMOCON_PROHIBIT),
+        }
+        safe = {
+            key: expected[key]
+            for key, options in values.items()
+            if expected.get(key) in options
+        }
+        temperature = expected.get("SetTemp")
+        if isinstance(temperature, str):
+            try:
+                number = float(temperature)
+            except ValueError:
+                pass
+            else:
+                if math.isfinite(number):
+                    safe["SetTemp"] = f"{number:g}"
+        if safe:
+            result["expected_attributes"] = safe
+        return result

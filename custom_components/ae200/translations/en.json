@@ -54,6 +54,17 @@
       },
       "last_successful_read": {
         "name": "Last successful read"
+      },
+      "last_command_status": {
+        "name": "Last command status",
+        "state": {
+          "unknown": "Unknown",
+          "pending": "Pending",
+          "accepted_unconfirmed": "Accepted, awaiting readback",
+          "not_yet_confirmed": "Readback does not yet match",
+          "confirmed": "Confirmed by readback",
+          "failed": "Failed"
+        }
       }
     },
     "binary_sensor": {
@@ -65,6 +76,9 @@
       },
       "communication_problem": {
         "name": "Communication problem"
+      },
+      "schedule_on": {
+        "name": "Controller schedule enabled"
       }
     },
     "switch": {

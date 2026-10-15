@@ -11,7 +11,7 @@ rest of the library can deal in plain Python strings rather than magic values.
 
 from __future__ import annotations
 
-VERSION = "0.2.0b2"
+VERSION = "0.2.0b3"
 
 # Transport
 DEFAULT_HTTP_PATH = "/servlet/MIMEReceiveServlet"
@@ -56,6 +56,9 @@ ALL_FAN_SPEEDS = (FAN_LOW, FAN_MID, FAN_MID1, FAN_MID2, FAN_HIGH, FAN_AUTO)
 # Vane / air direction
 AIR_DIR_VALUES = (
     "HORIZONTAL",
+    "MID0",
+    "MID1",
+    "MID2",
     "DOWNWARD1",
     "DOWNWARD2",
     "DOWNWARD3",

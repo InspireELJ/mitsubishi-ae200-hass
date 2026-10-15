@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import math
 
-from . import const
+from . import capabilities, const
 
 
 def _to_float(value: str | None) -> float | None:
@@ -34,10 +34,47 @@ def _flag(value: str | None, on: str, off: str) -> bool | None:
 class MelansDevice:
     """Read-only typed view of one group's state."""
 
-    def __init__(self, group_id: str, name: str | None, attrs: dict[str, str]):
+    def __init__(
+        self,
+        group_id: str,
+        name: str | None,
+        attrs: dict[str, str],
+        capability_attrs: dict[str, str] | None = None,
+    ):
         self.group_id = group_id
         self.name = name or f"Group {group_id}"
         self._attrs = attrs
+        self.capability_attributes = dict(capability_attrs or {})
+
+    @property
+    def supported_fan_speeds(self) -> list[str] | None:
+        return capabilities.fan_speeds(self.capability_attributes)
+
+    @property
+    def supported_air_directions(self) -> list[str] | None:
+        return capabilities.air_directions(self.capability_attributes)
+
+    @property
+    def supported_modes(self) -> list[str] | None:
+        return capabilities.modes(self.capability_attributes)
+
+    @property
+    def temperature_step(self) -> float | None:
+        detail = self.capability_attributes.get("TempDetailC")
+        return 0.5 if detail == "ENABLE" else 1.0 if detail == "DISABLE" else None
+
+    def temperature_range(self, mode: str | None = None) -> tuple[float, float] | None:
+        """Factory capability range for an ordinary AC mode, not a local lock."""
+        if self.capability_attributes.get("Model") != "IC":
+            return None
+        index = {"COOL": 1, "DRY": 1, "AUTO": 2, "HEAT": 3}.get(mode or self.mode)
+        if index is None:
+            return None
+        low = _to_float(self.capability_attributes.get(f"TempRange1Low{index}"))
+        high = _to_float(self.capability_attributes.get(f"TempRange1High{index}"))
+        if low is None or high is None or low >= high:
+            return None
+        return low, high
 
     # -- raw access -------------------------------------------------------
     def raw(self, key: str, default: str | None = None) -> str | None:

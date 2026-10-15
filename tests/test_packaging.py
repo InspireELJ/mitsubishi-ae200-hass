@@ -6,14 +6,17 @@ import importlib.util
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_bundled_library_is_identical_to_canonical_source():
     subprocess.run(
-        ["python3", str(ROOT / "scripts/sync_ha_library.py"), "--check"],
+        [sys.executable, str(ROOT / "scripts/sync_ha_library.py"), "--check"],
         check=True,
         capture_output=True,
     )
@@ -24,8 +27,6 @@ def test_ha_bundle_imports_without_an_external_pymelans_install():
     spec = importlib.util.spec_from_file_location(
         "inspire_packaging_test", source, submodule_search_locations=[str(source.parent)]
     )
-    import sys
-
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     try:
@@ -45,6 +46,7 @@ def test_manifest_keeps_domain_and_does_not_require_unpublished_library():
     assert not any(req.startswith("pymelans") for req in manifest["requirements"])
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX installer contract requires POSIX shell")
 def test_installer_and_rollback_preserve_registry(tmp_path):
     config = tmp_path / "config"
     existing = config / "custom_components/ae200"
@@ -69,6 +71,7 @@ def test_installer_and_rollback_preserve_registry(tmp_path):
     assert registry.read_text() == "unchanged-private-registry"
 
 
+@pytest.mark.skipif(os.name == "nt", reason="POSIX installer contract requires POSIX shell")
 def test_invalid_source_leaves_installation_untouched(tmp_path):
     config = tmp_path / "config"
     existing = config / "custom_components/ae200"

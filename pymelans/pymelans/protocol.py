@@ -11,6 +11,7 @@ import re
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable, Mapping
 
+from .capabilities import READ_ATTRIBUTES as _CAPABILITY_ATTRIBUTES
 from .exceptions import MelansProtocolError
 
 _XML_DECL = '<?xml version="1.0" encoding="UTF-8"?>'
@@ -108,6 +109,21 @@ def build_set_request(group_id: str | int, attributes: Mapping[str, str]) -> str
     ET.SubElement(root, "Command").text = "setRequest"
     manager = ET.SubElement(root, "DatabaseManager")
     ET.SubElement(manager, "Mnet", {"Group": _group_id(group_id), **attributes})
+    return _XML_DECL + ET.tostring(root, encoding="unicode")
+
+
+def build_capability_request(group_ids: Iterable[str | int]) -> str:
+    """Read bounded group capabilities, separately from frequently polled state."""
+    root = ET.Element("Packet")
+    ET.SubElement(root, "Command").text = "getRequest"
+    manager = ET.SubElement(root, "DatabaseManager")
+    ids = list(group_ids)
+    if not ids or len(ids) > 50:
+        raise ValueError("capability query requires 1 to 50 configured groups")
+    for gid in ids:
+        ET.SubElement(
+            manager, "Mnet", {"Group": _group_id(gid), **dict.fromkeys(_CAPABILITY_ATTRIBUTES, "*")}
+        )
     return _XML_DECL + ET.tostring(root, encoding="unicode")
 
 

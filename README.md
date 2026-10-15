@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-The `feat/inspire-monitoring-pilot` branch contains the `0.2.0b2` monitoring pilot.
+The company `main` branch contains the `0.2.0b3` capability pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -12,10 +12,18 @@ per-group freshness, controller health, checked command acknowledgements,
 cached raw-field diagnostics and a self-contained HACS bundle. Zero humidity
 is treated as an unverified value rather than a measurement.
 
+Version `0.2.0b3` adds a bounded capability query, per-group mode and fan choices,
+vertical vane control, reported temperature precision and limits, atomic
+mode/power commands and cached command-readback diagnostics. See the
+[capability matrix and development scope](docs/capabilities.md) for verified
+behaviour, equipment-family limits and the remaining expansion work.
+
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts
-use API boundary stubs. Real HA/controller end-to-end validation is still
-required before relying on this beta for unattended critical operations.
+use API boundary stubs. A live ordinary indoor AC group has accepted and
+confirmed temperature, fan, vane and compound fan-only/power commands, with
+its original settings restored. This does not validate every controller,
+equipment family or licensed function.
 
 The underlying protocol source remains in `pymelans/`. Run
 `python scripts/sync_ha_library.py` after changing it; never edit the generated
@@ -44,8 +52,9 @@ dependency**.
 
 ## Two ways to install
 
-This repository ships **both** so you can pick what suits your setup. They are
-interchangeable and share one protocol engine (`pymelans`).
+This repository ships **both** so you can pick what suits your setup. They
+share one protocol engine (`pymelans`); native HACS capability discovery and
+vane controls currently extend beyond the MQTT add-on's feature set.
 
 | | Add-on | Custom integration (HACS) |
 |---|---|---|
@@ -68,14 +77,17 @@ managers who value the watchdog and a dedicated settings page often prefer the
 - **Auto-discovery** of all configured groups, including their human names
   (read straight from the controller over its websocket API).
 - Native **`climate`** entity per indoor unit: power, mode
-  (cool / heat / fan / dry / auto), target temperature, fan speed.
+  (cool / heat / fan / dry / auto), target temperature, fan speed. HACS narrows
+  these choices using reported capabilities and adds vertical vane control.
 - **Diagnostics** per unit: return-air temperature, filter-cleaning alert,
   fault flag, and (where supported) outdoor temperature and humidity.
 - **Local remote lockout** switch (`RemoCon`) — lock out the wall/handset
   remote so occupants cannot override a centrally managed setpoint. A genuine
   building-manager feature.
-- **Generic across the device family** — indoor AC units, Lossnay / air
-  handlers and air-to-water units are detected from their reported attributes.
+- **Equipment classification**: indoor AC units, Lossnay / air handlers and
+  air-to-water units are inferred from reported attributes. Classification
+  alone does not establish verified control support for every family; consult
+  the [capability matrix](docs/capabilities.md).
 - **Resilient & safe**: websocket transport with automatic HTTP fallback,
   a self-healing poll loop with backoff, and deliberate rate-limiting (see
   [Safety](#safety--security)).
@@ -191,8 +203,9 @@ The protocol exposes far more than basic climate. Currently surfaced:
 | Fault | `binary_sensor` (problem) |
 | Local remote lockout | `switch` |
 
-Vane/air-direction, Lossnay ventilation mode and ATW flow controls are parsed
-by the library and are on the roadmap as entities.
+HACS exposes capability-based vertical vane/air-direction choices through the
+climate swing selector. Complete Lossnay ventilation and ATW controls remain
+on the roadmap; library parsing alone does not establish live control support.
 
 ---
 

@@ -23,10 +23,12 @@ async def async_setup_entry(
 ) -> None:
     coordinator: AE200Coordinator = hass.data[DOMAIN][entry.entry_id]
     entities: list[AE200Entity] = []
-    for gid in coordinator.data:
+    for gid, device in coordinator.data.items():
         entities.append(AE200FilterSign(coordinator, gid))
         entities.append(AE200ErrorSign(coordinator, gid))
         entities.append(AE200CommunicationProblem(coordinator, gid))
+        if device.raw("Schedule") in ("ON", "OFF"):
+            entities.append(AE200ScheduleOn(coordinator, gid))
     async_add_entities(entities)
 
 
@@ -76,3 +78,24 @@ class AE200CommunicationProblem(AE200Entity, BinarySensorEntity):
         if self._group_id not in self.coordinator.client.group_last_success:
             return None
         return not self.coordinator.client.is_group_available(self._group_id)
+
+
+class AE200ScheduleOn(AE200Entity, BinarySensorEntity):
+    """Controller scheduling enabled, not whether a scheduled action is active."""
+
+    _attr_translation_key = "schedule_on"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, coordinator: AE200Coordinator, group_id: str) -> None:
+        super().__init__(coordinator, group_id)
+        self._attr_unique_id = f"{coordinator.host}_{group_id}_schedule_on"
+
+    @property
+    def is_on(self) -> bool | None:
+        value = self.device.raw("Schedule") if self.device else None
+        if value == "ON":
+            return True
+        if value == "OFF":
+            return False
+        return None

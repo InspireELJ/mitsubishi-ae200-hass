@@ -51,6 +51,7 @@ class AE200Coordinator(DataUpdateCoordinator[dict[str, MelansDevice]]):
         try:
             if not self._discovered:
                 await self.client.discover()
+                await self.client.async_load_capabilities()
                 self._discovered = True
             return await self.client.async_update()
         except MelansError as err:

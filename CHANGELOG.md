@@ -3,6 +3,36 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0b3] - 2026-10-16
+
+### Added
+- One optional, bounded capability query after discovery, sharing the existing
+  request lock and pacing. Unsupported queries leave normal monitoring usable.
+- Per-group HA mode and fan choices from reported hardware capabilities, native
+  vertical vane/swing controls, temperature precision and reported limits.
+- Cached controller command-status and schedule-enabled diagnostic entities,
+  disabled by default. Schedule-enabled is a read-only controller flag.
+- A capability matrix separating implemented behaviour, live evidence and future
+  topology, alarms, schedules, ventilation, water and licensed energy work.
+
+### Fixed
+- Combine mode and power, or mode/power/temperature, in one validated command.
+  Reject unsupported known capabilities and invalid temperatures before writing.
+- Use the controller's actual MID0/MID1/MID2 vane vocabulary. Preserve existing
+  entity identifiers, fan labels and raw direction attributes.
+- Guard temperature writes to known NEW groups until their separate setpoint
+  fields and auto-mode semantics have been validated.
+- Track the latest command's readback independently of older pending settings.
+
+### Validation scope
+- Offline protocol, transport, HA contract, diagnostics and packaging tests.
+- Live capability reads for configured indoor AC groups. A single ordinary AC
+  group confirmed temperature, fan and vane changes while off, then a brief
+  compound fan-only/on command. Original mode, temperature, fan, vane and off
+  state were restored and read back successfully.
+- Other equipment families, schedule writes and licensed energy/accounting
+  functions remain outside this release's verified control scope.
+
 ## [0.2.0b2] - 2026-10-16
 
 ### Added
