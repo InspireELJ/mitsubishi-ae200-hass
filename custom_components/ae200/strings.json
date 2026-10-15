@@ -79,7 +79,8 @@
           "accepted_unconfirmed": "Accepted, awaiting readback",
           "not_yet_confirmed": "Readback does not yet match",
           "confirmed": "Confirmed by readback",
-          "failed": "Failed"
+          "failed": "Failed",
+          "outcome_unknown": "Outcome unknown"
         }
       }
     },

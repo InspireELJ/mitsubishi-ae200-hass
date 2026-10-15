@@ -39,17 +39,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
         await coordinator.async_config_entry_first_refresh()
         await coordinator.client.async_load_topology()
+        await coordinator.client.async_load_controller_metadata()
+        await coordinator.client.async_load_function_list()
     except Exception:
         await coordinator.client.close()
         raise
 
-    dr.async_get(hass).async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, coordinator.host)},
-        name="Mitsubishi centralised controller",
-        manufacturer="Mitsubishi Electric",
-        model="AE-200 / AE-50 / EW-50",
-    )
+    registry = dr.async_get(hass)
+    identifiers = {(DOMAIN, coordinator.host)}
+    existing = registry.async_get_device(identifiers=identifiers)
+    device_info: dr.DeviceInfo = {
+        "identifiers": identifiers,
+        "name": "Mitsubishi centralised controller",
+        "manufacturer": "Mitsubishi Electric",
+    }
+    metadata = coordinator.client.controller_metadata
+    if metadata is not None and metadata.model:
+        device_info["model"] = metadata.model
+    elif existing is None:
+        device_info["model"] = "AE-200 / AE-50 / EW-50"
+    if metadata is not None and metadata.version:
+        device_info["sw_version"] = metadata.version
+    registry.async_get_or_create(config_entry_id=entry.entry_id, **device_info)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

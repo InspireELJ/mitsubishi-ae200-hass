@@ -149,6 +149,34 @@ def cached_snapshot(client: MelansClient) -> dict[str, Any]:
         "read_errors": client.group_errors,
         "capability_error": client.capability_error,
         "last_command": _redact(client.last_command),
+        "controller_metadata": {
+            "attempted": client._metadata_attempted,
+            "last_attempt": client.metadata_last_attempt.isoformat() if client.metadata_last_attempt else None,
+            "last_successful_read": client.metadata_last_success.isoformat() if client.metadata_last_success else None,
+            "error": dict(client.metadata_error) if client.metadata_error else None,
+            "model": client.controller_metadata.model if client.controller_metadata else None,
+            "version": client.controller_metadata.version if client.controller_metadata else None,
+            "version_if": client.controller_metadata.version_if if client.controller_metadata else None,
+            "issues": [
+                {"kind": issue.kind, "record_index": issue.record_index, "key": issue.key}
+                for issue in client.controller_metadata.issues
+            ] if client.controller_metadata else [],
+        },
+        "functions": {
+            "attempted": client._functions_attempted,
+            "last_attempt": client.functions_last_attempt.isoformat() if client.functions_last_attempt else None,
+            "last_successful_read": client.functions_last_success.isoformat() if client.functions_last_success else None,
+            "error": dict(client.functions_error) if client.functions_error else None,
+            "records": [
+                {"index": record.index, "status": record.status,
+                 "time_limit": record.time_limit, "active": record.active}
+                for record in client.function_list.records
+            ] if client.function_list else [],
+            "issues": [
+                {"kind": issue.kind, "record_index": issue.record_index, "key": issue.key}
+                for issue in client.function_list.issues
+            ] if client.function_list else [],
+        },
         "topology": _cached_topology(client),
         "members": _cached_members(client),
         "groups": groups,
@@ -159,5 +187,7 @@ def cached_snapshot(client: MelansClient) -> dict[str, Any]:
             "Numeric M-NET addresses identify topology members, not network endpoints.",
             "Member status tokens are raw cached values; no physical operating state is inferred.",
             "No controller firmware, licence, Thermo-ON or energy support is inferred from absent fields.",
+            "Versions and function statuses are startup snapshots, not continuously refreshed state.",
+            "An active licence does not establish endpoint or equipment support; time limits are raw tokens.",
         ],
     }

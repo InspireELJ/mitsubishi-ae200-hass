@@ -11,6 +11,16 @@ class MelansConnectionError(MelansError):
     """Could not reach the controller (network, timeout, refused)."""
 
 
+class MelansCommandUncertainError(MelansError):
+    """A command may have been sent, but no acknowledgement was received.
+
+    This is deliberately not a connection error: automatically falling back
+    to another transport could send the same command to the controller twice.
+    A later state read may establish the result; this exception does not prove
+    either that the controller applied the command or that it rejected it.
+    """
+
+
 class MelansProtocolError(MelansError):
     """The controller returned a malformed or error response.
 

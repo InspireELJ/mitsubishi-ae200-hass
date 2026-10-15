@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-The company `main` branch contains the `0.2.0b4` membership diagnostics pilot.
+The company `main` branch contains the `0.2.0b5` controller metadata pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -21,6 +21,13 @@ behaviour, equipment-family limits and the remaining expansion work.
 Version `0.2.0b4` adds configured-member topology, an explicitly targeted
 read-only member diagnostic action, independent member freshness and websocket
 notification/response separation. See [member diagnostics](docs/member-diagnostics.md).
+
+Version `0.2.0b5` adds optional controller identity and licence-status snapshots
+at setup, with strict field filtering and independent errors. It also prevents
+HTTP replay of a websocket write whose result became uncertain after sending
+began. See [controller metadata and command outcomes](docs/controller-metadata.md).
+Licence status describes the reported entitlement, rather than verified
+hardware, endpoint or measurement support.
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts
@@ -85,16 +92,20 @@ managers who value the watchdog and a dedicated settings page often prefer the
   these choices using reported capabilities and adds vertical vane control.
 - **Diagnostics** per unit: return-air temperature, filter-cleaning alert,
   fault flag, and (where supported) outdoor temperature and humidity.
-- **Local remote lockout** switch (`RemoCon`) — lock out the wall/handset
+- **Local remote lockout** switch (`RemoCon`): lock out the wall/handset
   remote so occupants cannot override a centrally managed setpoint. A genuine
   building-manager feature.
 - **Equipment classification**: indoor AC units, Lossnay / air handlers and
   air-to-water units are inferred from reported attributes. Classification
   alone does not establish verified control support for every family; consult
   the [capability matrix](docs/capabilities.md).
-- **Resilient & safe**: websocket transport with automatic HTTP fallback,
-  a self-healing poll loop with backoff, and deliberate rate-limiting (see
-  [Safety](#safety--security)).
+- **Resilient & safe**: websocket transport with HTTP fallback for reads and
+  failures before a write is sent. An uncertain write is reported without replay.
+  The poll loop backs off after failures, and requests are deliberately limited
+  (see [Safety](#safety--security)).
+- **Cached controller metadata** in HACS: optional setup reads retain reported
+  display model, versions and function-status fields. They do not poll metadata
+  periodically, activate licences or fetch fault history.
 - **100% local**. No cloud, no account, no telemetry.
 
 ---
@@ -126,7 +137,7 @@ After the company release is published, new installations can use these steps:
 5. Enter the controller IP. Your zones are discovered automatically.
 
 The polling interval is adjustable later under the integration's **Configure**
-options (minimum 15 s — see Safety).
+options (minimum 15 s: see Safety).
 
 ### Manual install
 
@@ -135,7 +146,7 @@ directory and restart.
 
 ---
 
-## Install — Add-on
+## Install: Add-on
 
 1. **Settings → Add-ons → Add-on Store** → ⋮ → **Repositories**.
 2. Add `https://github.com/InspireELJ/mitsubishi-ae200-hass`.
@@ -161,7 +172,7 @@ per group.
 ## Settings & operation (building-manager notes)
 
 - **Watchdog / autostart**: the add-on declares a watchdog and `boot: auto`, and
-  its internal poll loop never dies on a transient controller/network blip — it
+  its internal poll loop never dies on a transient controller/network blip: it
   backs off and retries, and on a hard failure the Supervisor restarts the
   container.
 - **Polling interval**: keep this sensible. 30 s is a good default; 15 s is the
@@ -222,6 +233,7 @@ on the roadmap; library parsing alone does not establish live control support.
 | A zone shows no current temperature | Its return-air thermistor is faulted/disconnected (the controller reports ~ -40 °C); the integration reports *unknown* rather than a bogus value. |
 | Add-on won't start | Check `ae200_host` is set and an MQTT broker is available. |
 | Changes revert after a moment | Something else (a schedule, the wall remote, or a BMS) is also commanding the unit. Consider the remote-lockout switch. |
+| Last command shows `outcome_unknown` | Sending began, but an acknowledgement was lost. Check the subsequent state readback before deciding on another command. The integration does not repeat the write over HTTP or invent an acknowledgement. |
 
 Enable `debug` logging (add-on option, or integration logger) to see the raw
 protocol exchange.
@@ -248,18 +260,18 @@ and can be used standalone in your own scripts.
 
 ## Credits & prior art
 
-- [`natevoci/ae200`](https://github.com/natevoci/ae200) — first surfaced the
+- [`natevoci/ae200`](https://github.com/natevoci/ae200): first surfaced the
   AE-200 websocket (`b_xmlproc`) approach.
 - [`adgelbfish/mitsPy`](https://github.com/adgelbfish/mitsPy) and the
-  `g50a-client` from `jozemlakar/homebridge-mnet` — useful MELANS references.
+  `g50a-client` from `jozemlakar/homebridge-mnet`: useful MELANS references.
 
 This project goes further: a shared typed client, generic device-family
 support, native config flow **and** a watchdog'd add-on, diagnostics, and
 safety-first rate limiting.
 
-## License
+## Licence
 
-MIT — see [LICENSE](LICENSE).
+MIT: see [LICENSE](LICENSE).
 
 *Not affiliated with or endorsed by Mitsubishi Electric. "AE-200", "EW-50",
 "City Multi" and "Lossnay" are trademarks of their respective owners.*

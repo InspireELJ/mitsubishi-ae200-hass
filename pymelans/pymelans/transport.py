@@ -21,7 +21,7 @@ import xml.etree.ElementTree as ET
 import aiohttp
 
 from . import const
-from .exceptions import MelansConnectionError, MelansProtocolError
+from .exceptions import MelansCommandUncertainError, MelansConnectionError, MelansProtocolError
 
 
 def _packet_command(payload: str) -> str | None:
@@ -110,6 +110,7 @@ class WebsocketTransport:
         }.get(command)
         if expected is None:
             raise MelansProtocolError("unsupported websocket request command")
+        send_attempted = False
         try:
             async with websockets.connect(
                 self._uri,
@@ -119,6 +120,9 @@ class WebsocketTransport:
                 open_timeout=self._timeout,
                 close_timeout=self._timeout,
             ) as ws:
+                # A failed send can still have delivered some or all bytes.
+                # Mark the boundary before awaiting, not after send succeeds.
+                send_attempted = True
                 await ws.send(payload)
                 # A controller may push a notification before this request's
                 # response, even on a newly opened socket. Do not use that
@@ -151,8 +155,16 @@ class WebsocketTransport:
                 for close in (exc.sent, exc.rcvd)
             ):
                 raise MelansProtocolError("websocket rejected response frame") from exc
+            if command == "setRequest" and send_attempted:
+                raise MelansCommandUncertainError(
+                    "websocket closed after command transmission began; outcome is unknown"
+                ) from exc
             raise MelansConnectionError(f"websocket connection closed: {exc}") from exc
         except Exception as exc:
+            if command == "setRequest" and send_attempted:
+                raise MelansCommandUncertainError(
+                    "websocket command transmission began but acknowledgement was not received"
+                ) from exc
             raise MelansConnectionError(f"websocket request failed: {exc}") from exc
 
     async def close(self) -> None:  # symmetry with HttpTransport

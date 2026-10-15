@@ -10,9 +10,9 @@ from datetime import UTC, datetime
 
 import aiohttp
 
-from . import capabilities, const, protocol, topology
+from . import capabilities, const, metadata, protocol, topology
 from .device import MelansDevice
-from .exceptions import MelansConnectionError, MelansError
+from .exceptions import MelansCommandUncertainError, MelansConnectionError, MelansError
 from .transport import HttpTransport, WebsocketTransport
 
 
@@ -36,6 +36,18 @@ class MelansClient:
         self.devices: dict[str, MelansDevice] = {}
         self.group_capabilities: dict[str, dict[str, str]] = {}
         self.capability_error: str | None = None
+        self.controller_metadata: metadata.ControllerMetadata | None = None
+        self.metadata_last_attempt: datetime | None = None
+        self.metadata_last_success: datetime | None = None
+        self.metadata_error: dict[str, str | None] | None = None
+        self.function_list: metadata.FunctionSnapshot | None = None
+        self.functions_last_attempt: datetime | None = None
+        self.functions_last_success: datetime | None = None
+        self.functions_error: dict[str, str | None] | None = None
+        self._metadata_attempted = False
+        self._functions_attempted = False
+        self._metadata_lock = asyncio.Lock()
+        self._functions_lock = asyncio.Lock()
         self.topology: topology.MembershipSnapshot | None = None
         self.topology_last_attempt: datetime | None = None
         self.topology_last_success: datetime | None = None
@@ -173,6 +185,40 @@ class MelansClient:
         if not isinstance(code, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,32}", code) is None:
             code = None
         return {"type": type(error).__name__, "code": code}
+
+    async def async_load_controller_metadata(self) -> None:
+        """Read three optional identity/version fields once, without polling."""
+        async with self._metadata_lock:
+            if self._metadata_attempted:
+                return
+            self._metadata_attempted = True
+            self.metadata_last_attempt = datetime.now(UTC)
+            try:
+                response = await self._request(metadata.build_system_data_request())
+                snapshot = metadata.parse_system_data(response)
+            except MelansError as error:
+                self.metadata_error = self._optional_read_error(error)
+                return
+            self.controller_metadata = snapshot
+            self.metadata_last_success = datetime.now(UTC)
+            self.metadata_error = None
+
+    async def async_load_function_list(self) -> None:
+        """Read the optional licence-status directory once; never activate it."""
+        async with self._functions_lock:
+            if self._functions_attempted:
+                return
+            self._functions_attempted = True
+            self.functions_last_attempt = datetime.now(UTC)
+            try:
+                response = await self._request(metadata.build_function_list_request())
+                snapshot = metadata.parse_function_list(response)
+            except MelansError as error:
+                self.functions_error = self._optional_read_error(error)
+                return
+            self.function_list = snapshot
+            self.functions_last_success = datetime.now(UTC)
+            self.functions_error = None
 
     async def async_load_topology(self) -> None:
         """Attempt the optional configured-member directory once per client.
@@ -436,9 +482,15 @@ class MelansClient:
                 response = await self._request(payload)
                 protocol.parse_acknowledgement(response)
             except MelansError as err:
-                self.last_command["status"] = "failed"
+                uncertain = isinstance(err, MelansCommandUncertainError)
+                self.last_command["status"] = "outcome_unknown" if uncertain else "failed"
                 self.last_command["error_type"] = type(err).__name__
                 self.last_command["error_code"] = getattr(err, "code", None)
+                if uncertain:
+                    # The controller may have acted. Observe through the normal
+                    # bounded readback path, but never invent an acknowledgement.
+                    self._pending_writes.pop(group_id, None)
+                    self._readback_requested = True
                 raise
             finally:
                 self._last_write = time.monotonic()

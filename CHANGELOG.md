@@ -3,6 +3,31 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0b5] - 2026-10-16
+
+### Added
+- Optional, once-per-setup controller identity and function-status directory
+  reads, with independent errors and cached diagnostics. Only display model,
+  version and licence-status fields are retained; no keys or activation controls.
+- Strict metadata XML parsing, bounded function indices and conflict isolation.
+  Unknown status tokens remain unknown; raw time limits are not expiry dates.
+
+### Fixed
+- A websocket write which loses its response after sending begins is no longer
+  repeated over HTTP. Report `outcome_unknown`, preserve a bounded state-readback
+  opportunity, and never turn an observed matching state into a missing command
+  acknowledgement. Read fallback and failures before sending remain separate.
+
+### Validation scope
+- Live minimal controller identity and function-status directory reads confirmed
+  the response structures. Captured identities and licence inventories remain
+  private and are not included in fixtures or documentation.
+- Offline metadata, optional-read isolation and transport tests cover malformed
+  responses, unknown fields, duplicate conflicts and ambiguous write outcomes.
+- An active licence does not establish that its associated endpoint, equipment
+  or measurement is supported. This release adds no fault-history query,
+  licence activation, schedule write or energy inference.
+
 ## [0.2.0b4] - 2026-10-16
 
 ### Added
