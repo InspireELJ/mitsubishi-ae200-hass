@@ -93,6 +93,16 @@ python scripts/build_release.py
 
 `dist/ae200-0.2.0b1.zip` 及其 SHA-256 文件是构建产物，不提交到源码仓库。HACS 迁移时应先保存当前文件，再仅调整 HACS 中的仓库下载来源；业务集成条目保持不动。本文不让 HACS 和手动安装器同时管理更新。
 
+### 公司 fork 的 HACS 检查
+
+首次推送后的代码测试、打包和 hassfest 已通过；HACS validation 报告仓库没有启用 Issues，也没有 Topics。这是 fork 的仓库元数据设置，需要仓库管理员在 GitHub 中补齐：
+
+1. Settings → General → Features：启用 Issues。
+2. 仓库首页右侧 About 的齿轮：保留现有 Description，并添加相关 Topics，例如 `home-assistant`、`hacs`、`mitsubishi`、`hvac`。
+3. Actions → 失败的 CI → Re-run failed jobs，重新运行 HACS 检查。
+
+不通过增加 ignore 或取消检查来处理这两项错误。它们不阻止从已通过构建的分支 ZIP 手动部署，但迁移 HACS 更新来源前应修复。GitHub Issues 是公开渠道，问题报告也需要遵守下方现场数据边界。
+
 ## 现场数据边界
 
 不要提交真实控制器地址、凭据、序列号、许可注册码、房间名称清单、HA 配置备份或现场诊断 JSON 到公开 fork。脱敏的合成报文用于测试；现场文件通过现有内部渠道交换。
