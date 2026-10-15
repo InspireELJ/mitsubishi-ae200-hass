@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import itertools
 import json
+import re
 import types
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -210,7 +211,7 @@ def test_restriction_action_schema_translation_and_response_contract(restriction
     assert all(field["name"] and field["description"] for field in action["fields"].values())
     assert "does not reset" in action["fields"]["filter_reset_prohibited"]["description"]
     yaml = (component / "services.yaml").read_text().split("set_local_restrictions:\n", 1)[1]
-    yaml = yaml.split("read_member_runtime:\n", 1)[0]
+    yaml = re.split(r"(?m)^[a-z_]+:\n", yaml, maxsplit=1)[0]
     assert "config_entry:" in yaml and "integration: ae200" in yaml
     assert yaml.count("required: true") == 2 and yaml.count("boolean:") == 4
     assert "min: 1" in yaml and "max: 50" in yaml

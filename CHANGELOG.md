@@ -3,6 +3,39 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1b3] - 2026-10-16
+
+### Added
+- Response-only `ae200.read_member_temperature_history` action for one
+  explicitly selected entry, topology-validated IC address and Gregorian date.
+  The data name is fixed to `ROOM_TEMP`; one minimal GET reads that selector.
+- Independent raw history, sample times, safe errors and quality, with up to
+  32 member/date samples retained by a local LRU policy. Exact 48-token
+  sequences receive naive half-hour position labels, with no numeric
+  temperature, verified unit, aggregation, timezone or statistics projection.
+- Cached diagnostics export the room history without I/O. Room and runtime
+  history actions share their controller-wide 15-second completion cooldown;
+  no startup query, periodic poll, automatic day/channel scan or entity is added.
+
+### Fixed
+- A cancelled room or runtime history attempt records a safe cancellation
+  error and retains previous raw evidence and success time as stale. The
+  cancellation propagates and still starts the shared completion cooldown;
+  it does not leave an earlier sample presented as a fresh successful attempt.
+
+### Validation scope
+- One minimal live `ROOM_TEMP` response contained one record and 48 non-zero
+  numeric-looking tokens. Strict parsing produced 48 labelled positions
+  without issues. HA action deployment acceptance remains pending.
+- The vendor display expects Celsius, but the wire sample supplies neither a
+  unit nor aggregation or collection-validity metadata. The diagnostic keeps
+  `unit`, `aggregation` and `timezone` unknown, with no float conversion or
+  inference of averages, current room temperature or valid measurement.
+- The preceding `0.2.1b2` release passed deployed HA regression on the existing
+  OLD installation, preserving entity identifiers, operating settings,
+  permissions and automations. It does not provide live NEW acceptance;
+  public NEW temperature writes remain blocked.
+
 ## [0.2.1b2] - 2026-10-16
 
 ### Added

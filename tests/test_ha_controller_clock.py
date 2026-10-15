@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ACTION_NAMES = (
     "read_member", "read_control_context", "read_today_schedule", "read_controller_clock",
     "read_weekly_pattern", "set_local_restrictions", "read_member_runtime",
+    "read_member_temperature_history",
 )
 
 

@@ -7,11 +7,16 @@ which also request a mode or power change. A pure plan or a corrected read
 does not enable that control path.
 
 No representative live NEW capability/state sample, NEW temperature write,
-readback, restoration or HA acceptance has been established in this project.
+readback, restoration or NEW hardware acceptance has been established in this project.
 Existing OLD control tests do not validate the NEW field mapping on hardware.
 The implemented behaviour below is supported by static controller-client
 evidence and offline validation; NEW hardware support requires separate
 evidence. No live NEW control claim is made by this document.
+
+The deployed `0.2.1b2` integration and bundled library passed regression on
+the existing OLD installation. Original identifiers, operating settings,
+local permissions and automations were preserved. That acceptance does not
+exercise the NEW mapping on hardware or relax the public write guard.
 
 ## Three separate capabilities
 

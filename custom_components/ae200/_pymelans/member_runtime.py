@@ -13,19 +13,20 @@ import math
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from datetime import date
 from decimal import Decimal
 
-from .exceptions import MelansProtocolError
-from .topology import _identifier, _response
+from .daily_trend import (
+    BUCKET_COUNT,
+    BUCKET_MINUTES,
+    _build_request,
+    _time_label,
+    member_day_selector,
+)
+from .daily_trend import MAX_YEAR as MAX_YEAR
+from .daily_trend import MIN_YEAR as MIN_YEAR
+from .daily_trend import _directory as _daily_directory
 
-MIN_YEAR = 1970
-MAX_YEAR = 2037
-BUCKET_COUNT = 48
-BUCKET_MINUTES = 30
 DATA_FIELDS = {"FAN_TIME": "FanTimeData", "THERMO_TIME": "ThermoTimeData"}
-_XML_DECL = '<?xml version="1.0" encoding="UTF-8"?>'
-_XML_WHITESPACE = re.compile(r"[ \t\r\n]*")
 _UNSIGNED_DECIMAL = re.compile(r"[0-9]+(?:\.[0-9]+)?")
 
 
@@ -61,66 +62,19 @@ class MemberRuntime:
 
 
 def _selector(address: str | int, date_iso: str, data_name: str) -> dict[str, str]:
-    member = _identifier(address, 250)
-    if not isinstance(date_iso, str) or re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", date_iso) is None:
-        raise ValueError("date must be a strict Gregorian ISO date")
-    try:
-        day = date.fromisoformat(date_iso)
-    except ValueError as error:
-        raise ValueError("date must be a valid Gregorian day") from error
-    if not MIN_YEAR <= day.year <= MAX_YEAR:
-        raise ValueError("date is outside the pilot interpretation window")
+    selector = member_day_selector(address, date_iso)
     if not isinstance(data_name, str) or data_name not in DATA_FIELDS:
         raise ValueError("data_name must be FAN_TIME or THERMO_TIME")
-    return {
-        "Address": member, "Year": str(day.year), "Month": str(day.month),
-        "Day": str(day.day), "DataName": data_name,
-    }
+    return {**selector, "DataName": data_name}
 
 
 def build_member_runtime_request(address: str | int, date_iso: str, data_name: str) -> str:
     """Read one explicit member/day/runtime name; the client proves membership."""
-    selector = _selector(address, date_iso, data_name)
-    root = ET.Element("Packet")
-    ET.SubElement(root, "Command").text = "getRequest"
-    energy = ET.SubElement(ET.SubElement(root, "DatabaseManager"), "EnergyManagement")
-    ET.SubElement(energy, "IcTrendDList", selector)
-    return _XML_DECL + ET.tostring(root, encoding="unicode")
+    return _build_request(_selector(address, date_iso, data_name))
 
 
 def _directory(payload: str, selector: dict[str, str]) -> ET.Element:
-    _response(payload)
-    # Shared byte/DTD/entity/tree/depth/attribute guards run before the second
-    # bounded inspection. Validate the original tree before retaining fields.
-    root = ET.fromstring(payload)
-    if len(root) != 2 or sorted(child.tag for child in root) != ["Command", "DatabaseManager"]:
-        raise MelansProtocolError("unexpected member-runtime envelope children")
-    command = root.find("./Command")
-    assert command is not None
-    manager = root.find("./DatabaseManager")
-    assert manager is not None
-    children = list(manager)
-    if len(command) or len(children) != 1 or children[0].tag != "EnergyManagement":
-        raise MelansProtocolError("expected one direct member-runtime EnergyManagement")
-    directories = list(children[0])
-    if len(directories) != 1 or directories[0].tag != "IcTrendDList":
-        raise MelansProtocolError("expected one direct EnergyManagement/IcTrendDList")
-    directory = directories[0]
-    if any(directory.get(key) != value for key, value in selector.items()):
-        raise MelansProtocolError("member-runtime response selector mismatch")
-    records = list(directory)
-    if len(records) > 1 or any(node.tag != "IcTrendDRecord" or len(node) for node in records):
-        raise MelansProtocolError("expected at most one direct leaf IcTrendDRecord")
-    for node in root.iter():
-        if "Group" in node.attrib or "MultiGroup" in node.attrib:
-            raise MelansProtocolError("unverified group or aggregate member-runtime identity")
-        if node is not directory and any(key in node.attrib for key in selector):
-            raise MelansProtocolError("unexpected member-runtime selector placement")
-        if node.tag != "Command" and _XML_WHITESPACE.fullmatch(node.text or "") is None:
-            raise MelansProtocolError("non-whitespace text in member-runtime response")
-        if _XML_WHITESPACE.fullmatch(node.tail or "") is None:
-            raise MelansProtocolError("non-whitespace tail in member-runtime response")
-    return directory
+    return _daily_directory(payload, selector, context="member-runtime")
 
 
 def _minute_value(raw: str, key: str, issues: list[RuntimeIssue]) -> float | None:
@@ -142,10 +96,6 @@ def _minute_value(raw: str, key: str, issues: list[RuntimeIssue]) -> float | Non
         issues.append(RuntimeIssue(key, "unrepresentable_value"))
         return None
     return value
-
-
-def _time_label(minutes: int) -> str:
-    return f"{minutes // 60:02d}:{minutes % 60:02d}"
 
 
 def parse_member_runtime(

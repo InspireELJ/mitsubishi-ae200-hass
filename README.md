@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-This source targets the `0.2.1b2` NEW single-setpoint read and offline-planning pilot.
+This source targets the `0.2.1b3` raw member room-temperature-history pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -105,6 +105,17 @@ blocked and HA's temperature-control feature remains hidden for known NEW
 groups. No representative live NEW sample or NEW control acceptance exists;
 entity classification, advertised modes and OLD behaviour are preserved. See
 [NEW single-setpoint mapping and boundaries](docs/new-single-setpoint.md).
+Deployment regression has passed on the existing OLD installation, preserving
+entity identifiers, operating settings, local permissions and automations.
+
+Version `0.2.1b3` adds an explicit read-only room-temperature-history action
+for one topology-validated IC member and one date. It reads only `ROOM_TEMP`,
+preserving raw strings and, for exactly 48 tokens, naive half-hour position
+labels. Unit, aggregation and timezone remain unknown; there is no numeric
+temperature projection, statistic, entity or automatic query. Room and runtime
+history share a 15-second cooldown from completion. One minimal live response
+contained a non-zero 48-token sequence and passed parsing; HA action acceptance
+is pending. See [member temperature history](docs/member-temperature-history.md).
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts
