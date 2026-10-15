@@ -146,7 +146,7 @@ async def test_action_is_registered_without_entries_and_requires_a_response(ha_s
     c = ha_service_modules
     assert await c.integration.async_setup(c.hass, {})
     assert await c.integration.async_setup(c.hass, {})
-    assert c.hass.services.registrations == 3
+    assert c.hass.services.registrations == 4
     registered = c.hass.services.registered["ae200", "read_member"]
     assert registered["supports_response"] == c.SupportsResponse.ONLY
 
@@ -424,4 +424,4 @@ def test_action_fields_have_matching_translations():
     assert all(field["name"] and field["description"] for field in action["fields"].values())
     yaml = (ROOT / "custom_components/ae200/services.yaml").read_text()
     assert "config_entry:" in yaml and "integration: ae200" in yaml
-    assert yaml.count("required: true") == 6
+    assert yaml.count("required: true") == 7

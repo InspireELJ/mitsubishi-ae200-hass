@@ -11,7 +11,16 @@ from typing import Any
 
 import aiohttp
 
-from . import capabilities, const, control_context, metadata, protocol, today_schedule, topology
+from . import (
+    capabilities,
+    const,
+    control_context,
+    controller_clock,
+    metadata,
+    protocol,
+    today_schedule,
+    topology,
+)
 from .device import MelansDevice
 from .exceptions import MelansCommandUncertainError, MelansConnectionError, MelansError
 from .transport import HttpTransport, WebsocketTransport
@@ -58,6 +67,10 @@ class MelansClient:
         self._last_today_schedule_request: float | None = None
         self._today_schedules: dict[str, dict[str, Any]] = {}
         self._today_read_status: dict[str, str] = {}
+        self._clock_lock = asyncio.Lock()
+        self._last_clock_request: float | None = None
+        self._controller_clock: dict[str, Any] = {}
+        self._clock_read_status = "unknown"
         self.topology: topology.MembershipSnapshot | None = None
         self.topology_last_attempt: datetime | None = None
         self.topology_last_success: datetime | None = None
@@ -381,6 +394,58 @@ class MelansClient:
             "issues": [
                 {"kind": issue.kind, "record_index": issue.record_index, "key": issue.key}
                 for issue in sample.issues
+            ] if sample else [],
+        }
+
+    async def async_read_controller_clock(self) -> dict[str, Any]:
+        """Sample the controller's local clock without setting or interpreting its zone."""
+        async with self._clock_lock:
+            if (
+                self._last_clock_request is not None
+                and time.monotonic() - self._last_clock_request < const.MIN_POLL_INTERVAL
+            ):
+                self._clock_read_status = "cooldown"
+                return self.controller_clock_snapshot()
+            record = self._controller_clock
+            record["last_attempt"] = datetime.now(UTC)
+            try:
+                response = await self._request(controller_clock.build_controller_clock_request())
+                sample = controller_clock.parse_controller_clock(response)
+            except MelansError as error:
+                record["error"] = self._optional_read_error(error)
+                self._clock_read_status = "error"
+            else:
+                record.update(sample=sample, last_success=datetime.now(UTC),
+                              seen=time.monotonic(), error=None)
+                self._clock_read_status = "updated"
+            finally:
+                self._last_clock_request = time.monotonic()
+            return self.controller_clock_snapshot()
+
+    def controller_clock_snapshot(self) -> dict[str, Any]:
+        """Export a local wall-clock sample, never an extrapolated or UTC timestamp."""
+        record = self._controller_clock
+        sample = record.get("sample")
+        seen = record.get("seen")
+        fresh = (
+            seen is not None and not record.get("error")
+            and time.monotonic() - seen <= self.stale_after
+        )
+        return {
+            "read_status": self._clock_read_status,
+            "quality": "fresh" if fresh else "stale" if seen is not None else "unknown",
+            "last_attempt": record["last_attempt"].isoformat() if record.get("last_attempt") else None,
+            "last_successful_read": record["last_success"].isoformat() if record.get("last_success") else None,
+            "error": dict(record["error"]) if record.get("error") else None,
+            "raw_attributes": sample.raw_attributes() if sample else {},
+            "components": {
+                key: getattr(sample, key) if sample and fresh else None
+                for key in ("year", "month", "day", "hour", "minute", "second")
+            },
+            "local_datetime": sample.local_datetime if sample and fresh else None,
+            "timezone": None,
+            "issues": [
+                {"kind": issue.kind, "key": issue.key} for issue in sample.issues
             ] if sample else [],
         }
 
