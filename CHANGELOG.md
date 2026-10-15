@@ -3,6 +3,36 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1b7] - 2026-10-16
+
+### Fixed
+- Record safe cancellation errors for started Clock, today-schedule,
+  weekly-pattern, control-context and member-status attempts. Retain previous
+  raw evidence and successful-read times as stale, keep cold samples unknown,
+  propagate cancellation and apply the existing completion cooldown without retry.
+- Preserve independent control-context results on cancellation: only the
+  current record is marked cancelled, unattempted records are not overwritten
+  and no later GET is started. A successful global read remains fresh if the
+  group attempt is cancelled; cached status is partial after one success and
+  error after none. Waiting for a family lock does not create a new attempt.
+- Bound stored group-poll error codes to short ASCII tokens. Export read_errors
+  through a second type/code filter and fresh outer/inner dictionaries instead
+  of aliasing the live client cache; discard arbitrary extra/message fields.
+
+### Validation scope
+- Synthetic offline regressions cover warm/cold cancellation, partial context,
+  cooldown, bounded error fields and export mutation isolation. No live outage,
+  cancellation injection, real credential disclosure or external attack is claimed.
+- No new API, entity, request, poll cadence, control, command confirmation or
+  automation behaviour is introduced. Existing identifiers, healthy group
+  state and independent optional caches are preserved. HA deployment acceptance
+  for this version remains pending.
+- The preceding `0.2.1b6` deployed HA action passed eleven-field raw
+  action/cache/protocol checks and an immediate-repeat cooldown check. Only
+  the latest invocation status became cooldown; the other six snapshot fields
+  and observation times were preserved. Identifiers, operating settings,
+  permissions and automations were retained, without Clock or rule writes.
+
 ## [0.2.1b6] - 2026-10-16
 
 ### Added

@@ -305,6 +305,10 @@ class MelansClient:
                     try:
                         response = await self._request(request)
                         sample = parse(response)
+                    except asyncio.CancelledError:
+                        record["error"] = {"type": "CancelledError", "code": None}
+                        self._control_read_status[group] = "partial" if successes else "error"
+                        raise
                     except MelansError as error:
                         record["error"] = self._optional_read_error(error)
                     else:
@@ -386,6 +390,10 @@ class MelansClient:
             try:
                 response = await self._request(today_schedule.build_today_schedule_request(group))
                 sample = today_schedule.parse_today_schedule(response, expected_group=group)
+            except asyncio.CancelledError:
+                record["error"] = {"type": "CancelledError", "code": None}
+                self._today_read_status[group] = "error"
+                raise
             except MelansError as error:
                 record["error"] = self._optional_read_error(error)
                 self._today_read_status[group] = "error"
@@ -452,6 +460,10 @@ class MelansClient:
                     response, expected_group=group, expected_season=season_key,
                     expected_pattern=pattern_key,
                 )
+            except asyncio.CancelledError:
+                record["error"] = {"type": "CancelledError", "code": None}
+                self._weekly_read_status[key] = "error"
+                raise
             except MelansError as error:
                 record["error"] = self._optional_read_error(error)
                 self._weekly_read_status[key] = "error"
@@ -740,6 +752,10 @@ class MelansClient:
             try:
                 response = await self._request(controller_clock.build_controller_clock_request())
                 sample = controller_clock.parse_controller_clock(response)
+            except asyncio.CancelledError:
+                record["error"] = {"type": "CancelledError", "code": None}
+                self._clock_read_status = "error"
+                raise
             except MelansError as error:
                 record["error"] = self._optional_read_error(error)
                 self._clock_read_status = "error"
@@ -891,6 +907,10 @@ class MelansClient:
             try:
                 response = await self._request(request)
                 snapshot = topology.parse_address_state(response, expected_addresses=[member])
+            except asyncio.CancelledError:
+                self.member_errors[member] = {"type": "CancelledError", "code": None}
+                self.member_read_status[member] = "error"
+                raise
             except MelansError as error:
                 self.member_errors[member] = self._optional_read_error(error)
                 self.member_read_status[member] = "error"
@@ -990,10 +1010,7 @@ class MelansClient:
                         self.group_errors[gid] = {"type": "missing_group", "code": None}
                     connection_failures = 0
                 except MelansError as err:
-                    self.group_errors[gid] = {
-                        "type": type(err).__name__,
-                        "code": getattr(err, "code", None),
-                    }
+                    self.group_errors[gid] = self._optional_read_error(err)
                     connection_failures = (
                         connection_failures + 1 if isinstance(err, MelansConnectionError) else 0
                     )

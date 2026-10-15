@@ -27,7 +27,7 @@ data:
 Use the actual entry ID and an address present in its directory. An M-NET bus
 address is not the controller's IP address. The action requires response data;
 in scripts, add a `response_variable`. The controller-wide minimum gap between
-member reads is 15 seconds, including attempts for different addresses. Calls
+member reads is 15 seconds from completion, including attempts for different addresses. Calls
 within that cooldown, unknown addresses, unloaded entries and failed reads
 raise an action error. They do not silently substitute an earlier sample.
 
@@ -37,6 +37,14 @@ quality, attempt time, success time and error information. Group polling does
 not refresh an old member sample. A failed member read leaves group climate
 control usable and preserves the historical member sample with stale quality.
 Downloading diagnostics performs no controller I/O.
+
+From `0.2.1b7`, cancellation after a member attempt starts records a safe
+`CancelledError`, retains old raw evidence and successful-read time as stale,
+and leaves a cold member unknown. Cancellation propagates without retry and
+starts the completion cooldown. Cancellation while waiting for the member lock
+does not allocate a new attempt or cache entry. Group health, polling and
+commands remain unchanged. These cancellation cases are tested offline;
+no live outage or cancellation injection is claimed.
 
 Member responses preserve raw `ErrorSign`, `AlarmCode`, `ThermoStatus` and
 `FanStatus` strings. Empty, missing and wildcard values remain unknown. The

@@ -142,6 +142,13 @@ quality; typed hour/minute values become unknown. Missing evidence is unknown,
 not a fresh empty pattern. Downloading diagnostics must copy the existing
 cache without controller I/O.
 
+From `0.2.1b7`, cancelling a started attempt records a safe `CancelledError`,
+retains old raw records and successful-read time as stale, and leaves a cold
+selection unknown. Typed hour/minute values become unknown. Cancellation
+propagates without retry and starts the completion cooldown. Cancellation
+while waiting for the pattern lock makes no new attempt or cache change.
+This cancellation coverage is offline, without live failure injection.
+
 Reading this pattern together with a controller Clock or TodayList response
 does not make the samples atomic, associate the pattern with a verified date,
 prove activation or predict execution. No implicit clock query, season

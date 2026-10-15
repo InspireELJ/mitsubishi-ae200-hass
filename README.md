@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-This source targets the `0.2.1b6` raw daylight-settings diagnostic pilot.
+This source targets the `0.2.1b7` optional-read cancellation and diagnostic fixes.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -159,9 +159,22 @@ sample times, safe errors and missing-field issues, with an independent
 configuration without changing the clock. It does not establish current DST,
 an enable flag, timezone, UTC offset or evaluated transitions. Clock and
 SummerTime are separate samples; no shift or automatic Clock query is added.
-One prior minimal live GET confirmed the field shape; HA action acceptance
-remains pending. There is no polling, new entity or write. See
+One prior minimal live GET confirmed the field shape. Deployed HA acceptance
+confirmed an updated/fresh action with all eleven raw fields matching cached
+diagnostics and the prior sample. An immediate repeat was rejected by the
+cooldown; only the invocation status changed, retaining the sample and times.
+Identifiers, operating settings, permissions and automations were preserved.
+There is no polling, new entity or write. See
 [controller daylight settings](docs/controller-daylight-settings.md).
+
+Version `0.2.1b7` closes cancellation gaps in five existing optional readers:
+Clock, today schedule, weekly pattern, control context and member status.
+Started cancelled attempts retain old raw evidence as stale, propagate
+cancellation and respect completion cooldowns. Control-context records stay
+independent and cancellation starts no further GET. Group-poll errors also
+receive bounded tokens and diagnostic exports no longer alias the live error
+cache. These offline-tested fixes add no API, polling or control operation.
+See [diagnostic state quality](docs/diagnostic-state-quality.md).
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts

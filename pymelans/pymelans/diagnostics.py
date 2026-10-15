@@ -97,6 +97,31 @@ def _cached_members(client: MelansClient) -> dict[str, Any]:
     return members
 
 
+def _cached_read_errors(client: MelansClient) -> dict[str, dict[str, str | None]]:
+    """Detach group errors and retain only bounded machine-readable tokens."""
+    errors = client.group_errors
+    if not isinstance(errors, dict):
+        return {}
+    result = {}
+    for group, record in errors.items():
+        if (
+            not isinstance(group, str)
+            or re.fullmatch(r"[1-9][0-9]?", group) is None
+            or int(group) > const.MAX_GROUPS
+        ):
+            continue
+        fields = record if isinstance(record, dict) else {}
+        error_type = fields.get("type")
+        code = fields.get("code")
+        result[group] = {
+            "type": error_type if isinstance(error_type, str)
+            and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", error_type) else None,
+            "code": code if isinstance(code, str)
+            and re.fullmatch(r"[A-Za-z0-9_-]{1,32}", code) else None,
+        }
+    return result
+
+
 def cached_snapshot(client: MelansClient) -> dict[str, Any]:
     """Export cached samples, preserving field names but removing identities.
 
@@ -146,7 +171,7 @@ def cached_snapshot(client: MelansClient) -> dict[str, Any]:
         "stale_after_seconds": client.stale_after,
         "configured_group_count": len(client._names),
         "failed_groups": sorted(client.failed_groups, key=int),
-        "read_errors": client.group_errors,
+        "read_errors": _cached_read_errors(client),
         "capability_error": client.capability_error,
         "last_command": _redact(client.last_command),
         "control_context": client.control_context_snapshot(),

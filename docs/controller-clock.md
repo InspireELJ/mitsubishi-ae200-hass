@@ -92,6 +92,14 @@ timezone and issues. A completed read returns an `updated` or `error`
 diagnostic snapshot; validation and cooldown rejection are action errors.
 Before a successful sample exists, its successful-read time remains unknown.
 
+From `0.2.1b7`, cancellation after an attempt starts records a safe
+`CancelledError`, preserves any previous raw sample and success time as stale,
+and leaves a cold sample unknown. Typed components and `local_datetime` become
+unknown. Cancellation propagates without retry and still starts the completion
+cooldown. Cancellation while waiting for the Clock lock creates no attempt or
+cache change. These failure branches are verified offline, without live outage
+or cancellation injection.
+
 Clock freshness is independent of ordinary group polling. A failed optional
 clock read does not change climate availability or group-state freshness.
 After an error or expiry, historical raw fields and their sample time can

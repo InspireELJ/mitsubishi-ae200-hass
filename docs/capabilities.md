@@ -24,7 +24,7 @@ promise of support:
 
 Implementation status has a separate meaning:
 
-- **Implemented**: present in the `0.2.1b6` source. Individual device support
+- **Implemented**: present in the `0.2.1b7` source. Individual device support
   and end-to-end acceptance still apply. This is not a claim that every row has
   passed a live control test or that an installation has loaded this version.
 - **Shared library only**: protocol support exists without a complete native HA
@@ -32,7 +32,34 @@ Implementation status has a separate meaning:
 - **Planned**: a candidate requiring implementation, additional protocol
   evidence or a suitable device. It is not currently a supported HA feature.
 
-## Scope of 0.2.1b6
+## Scope of 0.2.1b7
+
+Five existing optional readers now record safe errors when a started attempt
+is cancelled: Clock, today schedule, weekly pattern, control context and member
+status. Prior raw samples and success times survive as stale; cold samples
+remain unknown. Cancellation propagates, does not retry and starts the existing
+completion cooldown. Cancellation while waiting for a family lock makes no
+new attempt or metadata change.
+
+Control-context cancellation marks only the current record. Previously
+successful parts retain independent freshness; an unattempted existing record
+is not overwritten, and no later GET starts after cancellation. Cached status
+is partial after one successful part and error after none. The cancelled action
+does not return a fabricated normal response.
+
+Group-poll errors now bound codes on storage. The `read_errors` exporter
+independently retains only bounded type/code tokens under canonical group
+keys, with new outer and inner dictionaries rather than references to client
+state. Arbitrary extra/message fields are dropped. This corrects synthetic
+offline cases with unsafe code strings and mutable cache aliases; no actual
+credential disclosure or external attack is asserted.
+
+No new API, entity, I/O, polling cadence, control, command-confirmation or
+automation behaviour is added. Normal group health remains independent of
+optional-read cancellation. HA deployment acceptance remains pending. See
+[diagnostic state quality](diagnostic-state-quality.md).
+
+## Daylight-settings scope introduced in 0.2.1b6
 
 The response-only `ae200.read_daylight_settings` action explicitly selects one
 loaded integration entry and reads one minimal controller-wide `SummerTime`
@@ -57,7 +84,12 @@ The official web client and one prior minimal live GET establish the shape,
 without verifying current DST, enable state, timezone, offset, transition
 evaluation or the Clock time basis. No derived fields or null placeholders
 for those claims are exported. Clock and SummerTime reads are not atomic,
-and no shift is added. HA action deployment acceptance remains pending.
+and no shift is added. Deployed HA acceptance confirmed updated/fresh raw
+fields matching the cached and prior protocol samples. An immediate repeat
+was rejected by cooldown: the latest invocation status changed, with all
+other six snapshot fields and sample times unchanged. Identifiers, operating
+settings, permissions and automations were retained. This remains configuration
+read evidence, not proof of current DST or time-basis semantics.
 
 ## Diagnostic-quality scope introduced in 0.2.1b5
 
@@ -466,7 +498,7 @@ behaviour and diagnostic entities described here apply to HACS.
 | Controller schedule flag and availability | Existing read-only diagnostic from 0.2.0b3; label corrected and separate availability attribute added in 0.2.0b9, disabled by default | Cached `Schedule` and `ScheduleAvail` values, with independent raw and nullable availability attributes. | Preserve the existing identifier and state source. Unknown or unavailable data stays unknown; neither flag proves activation, execution, today's records or next-run timing. No schedule write is implemented. |
 | Single-group today schedule | Explicit read-only diagnostic action in 0.2.0b7 | Official `TodayList` model; empty live response; non-empty offline fixtures only. | Accept non-empty plans on suitable equipment before interpreting execution. Preserve unknowns and sample times; no next-run calculation or schedule write. |
 | Controller local clock | Explicit read-only diagnostic action in 0.2.0b8 | Official six-field model, one minimal live GET and deployed HA action/cache acceptance. | Preserve local fields and unknowns. Validate Gregorian date/time before producing an offset-free local datetime; no timezone, DST, drift or atomic schedule-date inference. |
-| Controller daylight configuration | Explicit raw-only diagnostic in 0.2.1b6; HA action acceptance pending | Official eleven-field SummerTime builder and one prior minimal live response shape. | Keep XML-decoded strings and missing-field issues. No enabled/current-DST, timezone, offset, transition evaluation, Clock shift or atomic Clock/configuration claim. |
+| Controller daylight configuration | Explicit raw-only diagnostic in 0.2.1b6; selected HA action and cooldown accepted | Official eleven-field SummerTime builder, prior response shape and exact selected HA/raw/cache agreement. | Keep XML-decoded strings and missing-field issues. No enabled/current-DST, timezone, offset, transition evaluation, Clock shift or atomic Clock/configuration claim. |
 | Single-group weekly pattern | Explicit read-only diagnostic action in 0.2.0b9 | Official `WPatternList` builder, one single-selector empty live response and deployed HA action/cache acceptance. | Preserve unknowns and independent freshness, and verify non-empty actions separately. No automatic 35-slot scan, activation, execution, clock-date binding or server-capacity claim. |
 | Yearly patterns, season activation and schedule editing | Planned | Official season, annual-pattern and yearly-directory models. | Establish separately bounded request scopes and activation/precedence semantics. A today or single weekly-pattern sample is not the complete controller schedule. Design editing, backup and recovery separately after read-only acceptance. |
 | Member daily runtime and Thermo-ON history | On-demand raw and nullable-bucket diagnostic in 0.2.1b1; selected HA samples accepted; statistics and entities planned separately | Official IC daily graph grammar; one member/day accepted on FAN_TIME and THERMO_TIME, each with 48 zero tokens and exact fresh HA/cache agreement. | Validate non-zero data, collection quality, missing/partial/DST samples, other hardware and provenance before totals or HA statistics. Numeric zero and licence active do not establish measured idle time. |

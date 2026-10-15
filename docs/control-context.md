@@ -86,6 +86,21 @@ fails, the other is still attempted. Completed action responses use
 return their diagnostic context rather than concealing the available result.
 Validation errors and cooldown rejection remain action errors.
 
+From `0.2.1b7`, cancellation differs from a completed read failure: it
+propagates immediately and no later GET starts. Only the currently attempted
+global or group record receives a safe `CancelledError`; its old raw evidence
+and success time remain stale, or unknown when no success exists. An existing
+unattempted record is not overwritten. A successful global sample stays fresh
+if the group attempt is cancelled; the cached invocation status is partial
+after one successful part and error after none. This metadata remains visible
+in cached diagnostics, rather than a fabricated successful action response.
+
+The completion cooldown still applies. Cancellation while waiting for the
+context lock makes no new attempt or metadata change. Another independently
+fresh true stop flag can still make `control_inhibited=true`; an unknown source
+does not become an all-clear false. Tests cover these branches offline, without
+live outage or cancellation injection.
+
 Typed values are interpreted only from a fresh successful sample. Exact `ON`
 means `true` and exact `OFF` means `false`. Missing, blank, wildcard and other
 tokens remain unknown. An errored or aged sample can retain its historical raw
