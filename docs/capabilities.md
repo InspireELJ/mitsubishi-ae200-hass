@@ -24,7 +24,7 @@ promise of support:
 
 Implementation status has a separate meaning:
 
-- **Implemented**: present in the `0.2.1b1` source. Individual device support
+- **Implemented**: present in the `0.2.1b2` source. Individual device support
   and end-to-end acceptance still apply. This is not a claim that every row has
   passed a live control test or that an installation has loaded this version.
 - **Shared library only**: protocol support exists without a complete native HA
@@ -32,7 +32,32 @@ Implementation status has a separate meaning:
 - **Planned**: a candidate requiring implementation, additional protocol
   evidence or a suitable device. It is not currently a supported HA feature.
 
-## Scope of 0.2.1b1
+## Scope of 0.2.1b2
+
+The pure `new_single_setpoint` module implements a conservative
+`Model=IC`, explicitly empty `SubModel`, `IcKind=NORMAL`, `GroupType=NEW` and
+`AutoModeSWEx=ONE_SETPOINT` profile. It requires complete reported factory
+ranges, recognised DRY/FAN switches and known Celsius precision. An offline
+combined-command planner selects the target mode's field and limits before
+validating every requested setting. Frozen outputs contain only explicitly
+requested mode, power and one selected temperature field, without I/O.
+
+Known NEW cached target readings now use the validated raw-mode-specific
+register: `SetTemp1` for COOL/DRY, `SetTemp2` for HEAT and `SetTemp3` for AUTO.
+An OFF group retains its raw mode as context. Invalid profiles, unsupported
+branches and malformed, off-grid or out-of-range values remain unknown;
+there is no legacy `SetTemp` fallback, rounding or clamping.
+
+The planner is not connected to SET. Public NEW temperature writes remain
+blocked before I/O, including compound requests, and HA's temperature-control
+feature remains hidden for known NEW groups. Entity classification, advertised
+mode lists, OLD reads and existing identifiers are preserved. TWO_SETPOINT,
+SETBACK and other device families remain separate work. No representative live
+NEW capability/state sample or NEW control acceptance exists. See
+[NEW single-setpoint mapping](new-single-setpoint.md) for exact profile gates,
+offline contracts and the remaining control requirements.
+
+## Member-runtime scope introduced in 0.2.1b1
 
 The response-only `ae200.read_member_runtime` action requires an explicit
 entry, topology-validated IC address, strict Gregorian `date_iso` and one
@@ -56,9 +81,12 @@ zero. The single-record and attribute limits, 1970–2037 date window and typed
 0–30-minute range are defensive local pilot policies. They are not verified
 wire limits, history retention or backend capacity guarantees.
 
-One live `FAN_TIME` response contained 48 zero tokens, confirming the request
-and CSV shape. It does not establish measured idle time, logging validity,
-non-zero runtime or `THERMO_TIME` support. HA action acceptance is pending.
+One live `FAN_TIME` response contained 48 zero tokens. Deployed HA actions for
+one selected member and day have now accepted both `FAN_TIME` and `THERMO_TIME`:
+each returned a fresh successful one-record, 48-zero snapshot matching cached
+diagnostics exactly, with identifiers, permissions and automations preserved.
+This confirms the request, shape and HA/cache path for those samples. It does
+not establish measured idle time, logging validity or non-zero runtime.
 No daily total, statistics, cross-member sum, current running-state inference,
 timezone, UTC conversion or DST adjustment is introduced.
 
@@ -319,7 +347,7 @@ behaviour and diagnostic entities described here apply to HACS.
 | Controller local clock | Explicit read-only diagnostic action in 0.2.0b8 | Official six-field model, one minimal live GET and deployed HA action/cache acceptance. | Preserve local fields and unknowns. Validate Gregorian date/time before producing an offset-free local datetime; no timezone, DST, drift or atomic schedule-date inference. |
 | Single-group weekly pattern | Explicit read-only diagnostic action in 0.2.0b9 | Official `WPatternList` builder, one single-selector empty live response and deployed HA action/cache acceptance. | Preserve unknowns and independent freshness, and verify non-empty actions separately. No automatic 35-slot scan, activation, execution, clock-date binding or server-capacity claim. |
 | Yearly patterns, season activation and schedule editing | Planned | Official season, annual-pattern and yearly-directory models. | Establish separately bounded request scopes and activation/precedence semantics. A today or single weekly-pattern sample is not the complete controller schedule. Design editing, backup and recovery separately after read-only acceptance. |
-| Member daily runtime and Thermo-ON history | On-demand raw and nullable-bucket diagnostic in 0.2.1b1; statistics and entities planned separately | Official IC daily graph grammar and one selected 48-zero FAN_TIME response; HA action pending. | Validate non-zero data, collection quality, THERMO_TIME, missing/partial/DST samples and provenance before totals or HA statistics. Numeric zero and licence active do not establish measured idle time. |
+| Member daily runtime and Thermo-ON history | On-demand raw and nullable-bucket diagnostic in 0.2.1b1; selected HA samples accepted; statistics and entities planned separately | Official IC daily graph grammar; one member/day accepted on FAN_TIME and THERMO_TIME, each with 48 zero tokens and exact fresh HA/cache agreement. | Validate non-zero data, collection quality, missing/partial/DST samples, other hardware and provenance before totals or HA statistics. Numeric zero and licence active do not establish measured idle time. |
 | Electrical power, energy, COP and apportionment | Planned | Official energy models and documented licensed functions. | Establish installed metering and licences, data provenance, units and reset semantics. Keep measured, estimated and apportioned energy distinct. |
 | Lossnay and ventilation | Shared library only for partial parsing; complete HA control planned | Official ventilation capability flags and enum algorithms. | Obtain meaningful data from a ventilation installation. AC placeholder fields cannot establish Lossnay support. |
 | ATW, hot-water heat pumps and chillers | Partial legacy classification/sensors exist; verified device-specific HA support planned | Official separate operating modes, temperature ranges and system models. | Validate a suitable device before claiming device-family control. The existing generic climate entity is not proof of a verified hydronic mode mapping. |
@@ -423,7 +451,7 @@ hardware functions solely because local controls are prohibited.
    separately from operational state. A server-side history bound
    must be established before introducing a history request; local truncation
    alone does not bound controller work.
-4. Accept the bounded member-runtime diagnostic introduced in `0.2.1b1`
+4. Extend the selected HA-accepted member-runtime diagnostic in `0.2.1b1`
    separately from collection validity or statistical support. Add totals,
    runtime/energy entities or historical imports only after confirming valid
    sources, units, missing data and aggregation. Keep trend inspection explicit

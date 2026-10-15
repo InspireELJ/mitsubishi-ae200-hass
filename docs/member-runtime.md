@@ -1,7 +1,8 @@
 # On-demand member daily runtime diagnostics
 
 Version `0.2.1b1` adds the response-only `ae200.read_member_runtime` action.
-HA action deployment acceptance remains pending.
+Deployed HA acceptance has passed for one explicitly selected member and day
+on both `FAN_TIME` and `THERMO_TIME`.
 
 The diagnostic reader targets one topology-validated IC member,
 one explicitly selected Gregorian date and one fixed runtime data name.
@@ -10,10 +11,12 @@ values into 48 nullable half-hour buckets. It creates no entity, daily total,
 cross-member aggregate or Home Assistant statistics.
 
 One minimal live `FAN_TIME` request returned one record containing 48 literal
-zero tokens. That establishes an accepted request and sequence shape for that
-sample. It does not establish non-zero runtime, enabled history collection,
-licence validity, measured idle time or the physical meaning of zero. HA
-action deployment acceptance and a `THERMO_TIME` live sample remain pending.
+zero tokens. Deployed HA actions subsequently returned fresh successful
+`FAN_TIME` and `THERMO_TIME` snapshots, each with one record and 48 literal
+zero tokens, matching their cached selectors exactly. This establishes the
+request, sequence and HA/cache path for those samples. It does not establish
+non-zero runtime, enabled history collection, licence validity, measured idle
+time or the physical meaning of zero.
 
 ## One explicit member, day and runtime name
 
@@ -190,11 +193,17 @@ endpoint automatically.
 
 The saved official request builder and graph decoder establish the address/
 date/data-name syntax and the intended IC-member 48-slot display grammar.
-One selected `FAN_TIME` live sample confirms a one-record, 48-zero CSV shape.
-It does not establish a populated history, non-zero durations, `THERMO_TIME`
-support, resets, partial-day or DST-day behaviour, physical measurement or a
-valid statistics source. Pure parser tests and HA/client acceptance are
-separate checks; their results must be reported only after they actually run.
+The selected protocol sample and deployed HA actions confirm a one-record,
+48-zero sequence for `FAN_TIME` and `THERMO_TIME` on one member and day.
+Both action responses were fresh, had no issues and matched their cached
+snapshots exactly; bucket positions, labels and nullable projections were
+checked. Existing entity identifiers, original local permissions, off states
+and the enabled scheduled automation were preserved.
+
+This does not establish non-zero durations, collection validity, resets,
+partial-day or DST-day behaviour, other hardware, physical measurement or a
+valid statistics source. Pure parser tests, accepted request shapes and
+HA/cache acceptance remain distinct evidence from measurement validation.
 
 This diagnostic does not calculate a daily sum, create a duration/statistics
 entity, expose an increasing counter, combine multiple members or derive

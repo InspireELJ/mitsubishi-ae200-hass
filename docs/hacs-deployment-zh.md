@@ -1,6 +1,6 @@
 # 公司版本的 HACS 部署、更新与回退
 
-使用 `InspireELJ/mitsubishi-ae200-hass` 的自定义仓库和 GitHub Releases。候选版本为 `0.2.1b1`，增加显式单个已确认 IC 成员、单日及单项 FAN_TIME/THERMO_TIME 的运行趋势只读诊断；保留原文及新鲜时的 48 项 nullable 半小时分钟值，最多 32 个选择器样本属于本地 LRU 保留策略；全零只表示控制器返回零，不证明实际空闲或已启用采集；无总和、统计实体、自动日期扫描或 UTC/运行状态推断，HA 动作验收仍待完成；最低 HA Core 版本为 `2025.12.0`。本流程保留 `ae200` domain、现有集成条目和原有实体标识。
+使用 `InspireELJ/mitsubishi-ae200-hass` 的自定义仓库和 GitHub Releases。候选版本为 `0.2.1b2`，增加严格 NEW/ONE_SETPOINT 能力配置的纯离线规划器，并修正已知 NEW 组按原始模式读取 SetTemp1/2/3 的 typed 目标温度；无效或未知保持 unknown，不回退 SetTemp。规划器未接入 SET，公共 NEW 温度写入仍被拒绝，HA 温控功能仍隐藏；现场没有代表性 NEW 样本或控制验收。此前 `0.2.1b1` 的 FAN_TIME 与 THERMO_TIME 显式 HA 动作已完成选定成员、日期的验收，均返回 48 个零且与新鲜缓存精确一致；这不证明实际空闲、采集启用或测量有效。最低 HA Core 版本为 `2025.12.0`。本流程保留 `ae200` domain、现有集成条目和原有实体标识。
 
 内部使用只需把公司仓库添加到各 HA 的 HACS，无须申请进入公共商店。沿用当前公开 fork；现场地址、凭据、序列号和原始诊断文件继续保留在内部。
 
@@ -11,8 +11,8 @@
 3. 等待公司仓库 PR 的 test、hassfest、hacs 检查通过。只在公司仓库操作。
 4. 将公司仓库的开发 PR 合并到公司 `main`。若 PR 仍是 Draft，先在 PR 页面选择 Ready for review，再合并。
 5. 版本号变更合并到公司 `main` 后会自动启动 **Publish HACS release**。需要手动补跑时，打开 Actions → **Publish HACS release** → **Run workflow**，选择 `main`，运行。
-6. 工作流会重跑 CI；全部通过后校验版本一致性和归档校验和，创建 `v0.2.1b1` 标签及 Pre-release，并附上手动安装 ZIP 和 SHA-256。
-7. 在 Releases 确认 `v0.2.1b1` 已发布、标有 Pre-release，且目标是公司 `main` 的已测试提交。Draft release 不会提供给 HACS。
+6. 工作流会重跑 CI；全部通过后校验版本一致性和归档校验和，创建 `v0.2.1b2` 标签及 Pre-release，并附上手动安装 ZIP 和 SHA-256。
+7. 在 Releases 确认 `v0.2.1b2` 已发布、标有 Pre-release，且目标是公司 `main` 的已测试提交。Draft release 不会提供给 HACS。
 
 首次合并前，默认分支尚无这个工作流，因此 Actions 页面可能还没有 Run workflow 按钮。合并完成后再进入 Actions；首个版本正常情况下自动发布。
 
@@ -34,7 +34,7 @@ GitHub 托管的 Ubuntu runner 即可运行发布。工作流使用仓库内置 
 
    类型选择 **Integration**。
 
-4. 找到公司仓库，核对 Repository 链接中的 owner 是 `InspireELJ`。选择 Download。若版本选择器能直接显示 `v0.2.1b1`，选此版本；若 beta 尚未显示，首次可以选择公司 `main`，它在上述合并后应已包含同一 `0.2.1b1` 代码。下载完成前不要重启。
+4. 找到公司仓库，核对 Repository 链接中的 owner 是 `InspireELJ`。选择 Download。若版本选择器能直接显示 `v0.2.1b2`，选此版本；若 beta 尚未显示，首次可以选择公司 `main`，它在上述合并后应已包含同一 `0.2.1b2` 代码。下载完成前不要重启。
 5. 在现有 HA 终端运行 `ha core check`；没有 `ha` 命令的安装类型，使用其正常配置检查入口。通过后正常重启 HA。
 6. 核对已加载版本、原有实体标识、数量、房间分配、自动化目标及新增健康状态，并按[现场验收](deployment-zh.md#部署后的验收)下载诊断。`medium_1`、`medium_2` 分别保留控制器报告的 `MID1`、`MID2`；它们不是百分比，也不代表已发现每台室内机的全部可用风档。
 7. 继续执行下一节，为这个公司仓库开启 beta 更新并固定到 Release。
@@ -50,12 +50,14 @@ HACS 2.x 使用仓库对应的 **Pre-release** 开关控制 beta 更新。开关
 1. 首次公司版下载并重启后，进入 HA **设置 → 设备与服务 → 实体**。
 2. 按 Integration 筛选 **HACS**，显示禁用实体；找到这个 Mitsubishi 公司仓库对应的 **Pre-release** 开关。核对它属于公司仓库，启用实体并打开开关。
 3. 返回 HACS 的公司仓库菜单，选择 **Update information**。
-4. 选择 **Redownload → Need a different version? → v0.2.1b1 → Download**。部分前端也提供 Show beta versions 入口；最终以所选 Release 标签为准。
+4. 若 HA **设置 → 更新** 中已有公司集成的更新卡，先核对 Installed 与 Latest 明确显示的版本，再使用 **Update**。也可选择 **Redownload → Need a different version? → v0.2.1b2 → Download**。部分前端提供 Show beta versions 入口；最终以明确显示的目标 Release 标签为准。
 5. 下载后正常重启 HA，并核对版本。首次如果使用了 `main`，这一步让 HACS 记录为明确的已发布版本。
 
 更新信息只刷新版本元数据；Download/Redownload 才会替换代码。更新后的正常重启仍然需要完成。
 
 一次 `v0.2.0b10` 升级的实际观察是：HACS 下载页默认仍显示 b9，展开 **Need a different version?** 后，b10 位于 Release 列表末尾；明确选中 `v0.2.0b10` 后才开始下载。不要从默认显示或列表顺序推断目标版本，也不据此猜测排序或缓存原因。本轮采用新的 `0.2.1b1` patch 预发布序列，保留全部既有标签与资产；仍需显式核对所选 Release，不承诺新序列会改变该界面行为。
+
+`0.2.1b1` 实际升级已通过设置中的更新卡进行：核对 Latest 为目标版本后点击 Update，重启后实际加载的 manifest 与内置库均为 `0.2.1b1`。两个运行趋势通道的 HA 响应均与各自缓存精确一致，原有实体标识、本地限制和自动化保留。此验收不替代下一版本的重启、版本及功能核对。
 
 ## 后续迭代
 

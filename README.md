@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-This source targets the `0.2.1b1` member daily-runtime diagnostic pilot.
+This source targets the `0.2.1b2` NEW single-setpoint read and offline-planning pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -88,11 +88,23 @@ buttons were not tested. See
 Version `0.2.1b1` adds an explicit read-only action for one configured IC
 member, one date and one runtime data name. It retains raw history and 48
 nullable half-hour projections with independent freshness and bounded local
-retention. One live `FAN_TIME` sample returned 48 zero tokens, establishing the
-response shape without proving idle time or enabled collection. HA action
-acceptance is pending. No total, statistics entity, automatic history scan or
-current operating-state inference is added. See
+retention. Deployed HA actions for one member and day returned fresh
+`FAN_TIME` and `THERMO_TIME` snapshots matching cached diagnostics exactly,
+each with 48 zero tokens. Existing identifiers, permissions and automations
+were retained. Zero does not prove idle time, enabled collection or measurement
+validity. No total, statistics entity, automatic history scan or current
+operating-state inference is added. See
 [member runtime diagnostics](docs/member-runtime.md).
+
+Version `0.2.1b2` adds a pure offline profile and planner for a complete,
+explicit ordinary IC/NEW/ONE_SETPOINT capability set. Cached target reads use
+the raw mode's `SetTemp1`, `SetTemp2` or `SetTemp3` and retain unknowns rather
+than falling back to legacy `SetTemp`. The planner performs no I/O and is not
+connected to public SET operations. Public NEW temperature writes remain
+blocked and HA's temperature-control feature remains hidden for known NEW
+groups. No representative live NEW sample or NEW control acceptance exists;
+entity classification, advertised modes and OLD behaviour are preserved. See
+[NEW single-setpoint mapping and boundaries](docs/new-single-setpoint.md).
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts
