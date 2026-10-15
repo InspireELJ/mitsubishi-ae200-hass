@@ -128,11 +128,15 @@ external attack or live fault-injection result.
 Offline HA contracts cover fresh/unknown and unavailable states, allowlisted
 item values, retained identifiers and no-I/O behaviour. These checks do not
 create a live outage, change a controller flag, exercise a wall-remote button
-or widen hardware support. The actual HA integration and bundled library
-loaded `0.2.1b5`; all groups were fresh and their three climate flags matched
-cached raw values, including reported filter-on values. Existing identifiers,
-operating settings, local permissions and the enabled automation were retained.
-No live outage was injected, no control was sent for this regression and the
-default-disabled last-command sensor was not enabled. This normal-site check
-does not extend the unavailable/error or command-field tests into a claimed
-live fault/command acceptance.
+or widen hardware support. Deployed HA normal-operation regression loaded
+matching `0.2.1b7` integration and bundled-library versions. Fresh climate
+flags matched cached raw data, while identifiers, operating settings, local
+permissions and automations were retained. The existing Clock action returned
+a fresh successful response matching its cache with its prior schema and
+interpretation unchanged; no timezone or daylight adjustment was inferred.
+
+No live cancellation, outage or fault was injected, no control was sent for
+this regression and the default-disabled last-command sensor was not enabled.
+Cancellation, malformed poll errors, command filtering and export mutation
+isolation remain offline-tested branches. This normal-operation check does
+not extend them into claimed live fault/command acceptance.

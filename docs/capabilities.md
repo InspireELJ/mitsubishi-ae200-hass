@@ -56,7 +56,12 @@ credential disclosure or external attack is asserted.
 
 No new API, entity, I/O, polling cadence, control, command-confirmation or
 automation behaviour is added. Normal group health remains independent of
-optional-read cancellation. HA deployment acceptance remains pending. See
+optional-read cancellation. Deployed HA normal-operation regression confirmed
+matching integration/library versions, retained identifiers, operating settings,
+permissions and automations, and the unchanged Clock action/cache contract.
+Cancellation, malformed-error and mutable-alias cases remain offline evidence;
+no live outage/fault was injected or default-disabled command sensor enabled.
+See
 [diagnostic state quality](diagnostic-state-quality.md).
 
 ## Daylight-settings scope introduced in 0.2.1b6

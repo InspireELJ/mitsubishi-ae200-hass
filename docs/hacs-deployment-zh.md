@@ -1,6 +1,6 @@
 # 公司版本的 HACS 部署、更新与回退
 
-使用 `InspireELJ/mitsubishi-ae200-hass` 的自定义仓库和 GitHub Releases。候选版本为 `0.2.1b7`，修复五类既有可选读取在开始后被取消时的缓存质量：保留旧 raw/成功时刻为 stale，冷缓存 unknown，记录安全 CancelledError 并传播取消，按完成时刻冷却且不重试。控制上下文仅标当前记录，不覆盖未尝试的旧记录或继续后续 GET。组轮询错误代码改为受限 ASCII token，read_errors 导出再过滤 type/code 并建立独立两层字典，额外 message/URL 等字段丢弃，调用者不能经返回值修改客户端错误缓存。无新 API、实体、请求、轮询节奏、控制或自动化；这些分支以合成离线测试验证，不声称真实泄漏、攻击或现场故障注入。b7 HA 部署回归待实际结果；b6 daylight 的实际 HA 动作已通过：11 项 raw 与缓存及协议样本一致，立即重复被冷却拒绝，缓存仅 invocation status 变为 cooldown，其余六项字段与采样时间保持；原实体、运行设置、限制及自动化保留，不推 DST 或调整 Clock。最低 HA Core 版本为 `2025.12.0`。本流程保留 ae200 domain、既有实体标识与自动化。
+使用 `InspireELJ/mitsubishi-ae200-hass` 的自定义仓库和 GitHub Releases。当前已发布版本为 `0.2.1b7`，修复五类既有可选读取在开始后被取消时的缓存质量：保留旧 raw/成功时刻为 stale，冷缓存 unknown，记录安全 CancelledError 并传播取消，按完成时刻冷却且不重试。控制上下文仅标当前记录，不覆盖未尝试的旧记录或继续后续 GET。组轮询错误代码改为受限 ASCII token，read_errors 导出再过滤 type/code 并建立独立两层字典，额外 message/URL 等字段丢弃，调用者不能经返回值修改客户端错误缓存。无新 API、实体、请求、轮询节奏、控制或自动化；这些分支以合成离线测试验证，不声称真实泄漏、攻击或现场故障注入。b7 已完成正常运行的 HA 部署回归：集成与内置库版本相符，原实体标识、运行设置、本地权限及自动化保留，既有 Clock 动作与缓存保持原 schema/解释；没有注入现场取消、断线或故障，也未为测试启用默认禁用的命令传感器，取消、异常代码和副本隔离仍依据离线测试；b6 daylight 的实际 HA 动作已通过：11 项 raw 与缓存及协议样本一致，立即重复被冷却拒绝，缓存仅 invocation status 变为 cooldown，其余六项字段与采样时间保持；原实体、运行设置、限制及自动化保留，不推 DST 或调整 Clock。最低 HA Core 版本为 `2025.12.0`。本流程保留 ae200 domain、既有实体标识与自动化。
 
 b5 的三个气候布尔诊断同时要求实体可用且 group quality 精确为 fresh。失败或 outcome_unknown 的最后命令可额外显示白名单错误类型及受限短代码；消息、URL、连接详情、未知类型和非法代码不展示，原命令状态枚举与读回规则保持。
 
