@@ -194,16 +194,18 @@ class AE200Climate(AE200Entity, ClimateEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         dev = self.device
         if not dev:
-            return {}
+            return {"filter_sign": None, "error_sign": None, "local_remote_prohibited": None}
         limits = dev.temperature_range()
+        quality = self.coordinator.client.group_quality(self._group_id)
+        fresh = self.available and quality == "fresh"
         return {
             "group_id": dev.group_id,
             "air_direction": dev.air_direction,
-            "filter_sign": dev.filter_sign,
-            "error_sign": dev.error_sign,
-            "local_remote_prohibited": dev.local_remote_prohibited,
+            "filter_sign": dev.filter_sign if fresh else None,
+            "error_sign": dev.error_sign if fresh else None,
+            "local_remote_prohibited": dev.local_remote_prohibited if fresh else None,
             "transport": self.coordinator.client.transport_name,
-            "data_quality": self.coordinator.client.group_quality(self._group_id),
+            "data_quality": quality,
             "fan_speed_raw": dev.fan_speed,
             "current_mode_min_temp_celsius": limits[0] if limits else None,
             "current_mode_max_temp_celsius": limits[1] if limits else None,

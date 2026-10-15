@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -23,6 +24,11 @@ from ._pymelans import const as mc
 from .const import DOMAIN
 from .coordinator import AE200Coordinator
 from .entity import AE200ControllerEntity, AE200Entity
+
+_COMMAND_ERROR_TYPES = (
+    "MelansError", "MelansConnectionError", "MelansCommandUncertainError",
+    "MelansProtocolError", "MelansAuthError", "CancelledError",
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -193,11 +199,21 @@ class AE200LastCommandStatus(AE200ControllerEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
-        """Only publish known command fields, never connection/error details."""
+        """Publish checked command fields and bounded errors, never raw messages."""
         command = self.coordinator.client.last_command
         if not isinstance(command, dict):
             return {}
         result = {}
+        if command.get("status") in ("failed", "outcome_unknown"):
+            error_type = command.get("error_type")
+            if isinstance(error_type, str) and error_type in _COMMAND_ERROR_TYPES:
+                result["error_type"] = error_type
+                code = command.get("error_code")
+                if "error_code" in command and (
+                    code is None
+                    or isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,32}", code)
+                ):
+                    result["error_code"] = code
         group_id = command.get("group_id")
         if (
             isinstance(group_id, str)
@@ -225,6 +241,10 @@ class AE200LastCommandStatus(AE200ControllerEntity, SensorEntity):
             "FanSpeed": mc.ALL_FAN_SPEEDS,
             "AirDirection": mc.AIR_DIR_VALUES,
             "RemoCon": (mc.REMOCON_PERMIT, mc.REMOCON_PROHIBIT),
+            "DriveItem": ("CHK_ON", "CHK_OFF"),
+            "ModeItem": ("CHK_ON", "CHK_OFF"),
+            "SetTempItem": ("CHK_ON", "CHK_OFF"),
+            "FilterItem": ("CHK_ON", "CHK_OFF"),
         }
         safe = {
             key: expected[key]

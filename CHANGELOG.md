@@ -3,6 +3,40 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1b5] - 2026-10-16
+
+### Fixed
+- Return unknown for climate attributes `filter_sign`, `error_sign` and
+  `local_remote_prohibited` whenever the entity is unavailable, including
+  stale or failed group data, failed coordinator updates and missing devices.
+  Old cached false flags are no longer presented as current negative results;
+  only an available entity with exact `fresh` group quality retains its
+  recognised boolean interpretation.
+- Include the already-written local restriction fields `DriveItem`,
+  `ModeItem`, `SetTempItem` and `FilterItem` in the last-command diagnostic's
+  `expected_attributes`, accepting only exact `CHK_ON` or `CHK_OFF` tokens.
+  Missing, wildcard and unrecognised tokens are omitted.
+- Retain bounded `error_type` and `error_code` diagnostics only for failed or
+  uncertain commands with a recognised error class. Unknown types, invalid
+  codes, messages and connection details are not exposed; native status options
+  and acknowledgement/readback rules are unchanged.
+
+### Scope
+- Preserve existing unique IDs, default-disabled command diagnostics, standard
+  climate readings, central controls, actions and automations. These cached
+  presentation fixes add no I/O, polling, write, replay or confirmation logic.
+- Command expectations describe the saved command, not current restrictions,
+  physical wall-remote behaviour or a new acknowledgement. HA deployment
+  acceptance for this version remains pending.
+- The preceding `0.2.1b4` deployed HA actions passed selected cooling and
+  heating history checks against cached diagnostics and prior protocol
+  samples, preserving all 48 raw slots, including empty heating strings.
+  Existing identifiers, operating settings, permissions and automations were
+  retained. No live fault injection was performed for the b5 fixes.
+- Describe Clock values as controller-reported calendar/clock fields. Whether
+  they already include daylight adjustment remains unverified; no shift,
+  timezone conversion or new clock query is added.
+
 ## [0.2.1b4] - 2026-10-16
 
 ### Added

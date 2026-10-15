@@ -1,8 +1,8 @@
 # On-demand controller-clock diagnostics
 
 Version `0.2.0b8` adds the response-only `ae200.read_controller_clock` action to
-the native HACS integration. An explicit request reads the controller's local
-wall-clock fields and retains an independently timed diagnostic snapshot.
+the native HACS integration. An explicit request reads the controller-reported
+calendar/clock fields and retains an independently timed diagnostic snapshot.
 Existing entities, identifiers, central controls and HA automations are
 preserved. One minimal live Clock GET confirmed the six-field response and
 passed strict parsing without issues. HA deployment acceptance also confirmed
@@ -12,6 +12,9 @@ existing entity identifiers and automations preserved.
 There is no clock read at setup or reload, periodic clock poll, new clock
 entity, clock write or time synchronisation. The snapshot does not establish
 the controller's timezone, daylight-saving rules, clock accuracy or drift.
+Whether these fields already include daylight adjustment remains unverified.
+The reader does not add or subtract a shift or combine Clock with separate
+daylight settings to manufacture an adjusted time.
 
 ## Explicit controller selection
 
@@ -68,13 +71,14 @@ the typed day unknown. Valid independent components can still be reported;
 they do not establish a complete date when another component is unknown.
 
 `local_datetime` is produced only when all six components form a valid date
-and time and the sample remains fresh and successful. It is an ISO local-time
-string without an offset. The response's `timezone` remains unknown. Neither
+and time and the sample remains fresh and successful. It represents the
+reported fields as an ISO string without an offset; it does not establish
+daylight-adjusted local civil time. The response's `timezone` remains unknown. Neither
 HA's configured timezone nor the browser's timezone is assigned to the sample.
 The stored value is a sample, not a ticking clock extrapolated after reading.
 
 Attempt and successful-read timestamps describe HA's observation of the
-request. They are separate from the controller's reported wall clock and do
+request. They are separate from the controller-reported calendar/clock fields and do
 not establish its UTC offset, daylight-saving state or clock drift. This
 action does not inspect a time synchronisation service or change the clock.
 

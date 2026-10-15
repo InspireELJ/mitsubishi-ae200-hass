@@ -3,7 +3,7 @@
 Version `0.2.1b4` adds the response-only `ae200.read_member_setpoint_history`
 action. One explicit invocation reads one topology-validated IC member,
 one calendar date and either `COOL_SET_TEMP` or `HEAT_SET_TEMP`.
-HA action deployment acceptance remains pending.
+Deployed HA acceptance has passed for both selected channels on one member/day.
 
 The result preserves raw strings rather than numeric temperatures. Unit,
 aggregation and timezone remain unknown. It changes no setpoint, does not
@@ -150,7 +150,13 @@ contained 48 empty strings. Those selected wire shapes were accepted; they
 do not establish units, aggregation, collection state or other hardware.
 Public documentation retains no private address, site date, raw values or inventory.
 
-HA action deployment acceptance is pending. Numeric projection, current-state
+Deployed HA actions for both channels returned updated, fresh, one-record,
+48-slot snapshots matching cached diagnostics and prior protocol samples
+exactly. All 48 empty heating strings were preserved. Original entity
+identifiers, operating settings, local permissions and the enabled scheduled
+automation were retained. Unit, aggregation and timezone remained unknown.
+
+Numeric projection, current-state
 interpretation, sampling semantics, missing-data policies, DST handling and
 HA statistics remain separate work. Existing identifiers, controls, schedules
 and automations are preserved. See [room history](member-temperature-history.md),
