@@ -52,8 +52,9 @@ dependency**.
 
 ## Two ways to install
 
-This repository ships **both** so you can pick what suits your setup. They are
-interchangeable and share one protocol engine (`pymelans`).
+This repository ships **both** so you can pick what suits your setup. They
+share one protocol engine (`pymelans`); native HACS capability discovery and
+vane controls currently extend beyond the MQTT add-on's feature set.
 
 | | Add-on | Custom integration (HACS) |
 |---|---|---|
@@ -76,14 +77,17 @@ managers who value the watchdog and a dedicated settings page often prefer the
 - **Auto-discovery** of all configured groups, including their human names
   (read straight from the controller over its websocket API).
 - Native **`climate`** entity per indoor unit: power, mode
-  (cool / heat / fan / dry / auto), target temperature, fan speed.
+  (cool / heat / fan / dry / auto), target temperature, fan speed. HACS narrows
+  these choices using reported capabilities and adds vertical vane control.
 - **Diagnostics** per unit: return-air temperature, filter-cleaning alert,
   fault flag, and (where supported) outdoor temperature and humidity.
 - **Local remote lockout** switch (`RemoCon`) — lock out the wall/handset
   remote so occupants cannot override a centrally managed setpoint. A genuine
   building-manager feature.
-- **Generic across the device family** — indoor AC units, Lossnay / air
-  handlers and air-to-water units are detected from their reported attributes.
+- **Equipment classification**: indoor AC units, Lossnay / air handlers and
+  air-to-water units are inferred from reported attributes. Classification
+  alone does not establish verified control support for every family; consult
+  the [capability matrix](docs/capabilities.md).
 - **Resilient & safe**: websocket transport with automatic HTTP fallback,
   a self-healing poll loop with backoff, and deliberate rate-limiting (see
   [Safety](#safety--security)).
@@ -199,8 +203,9 @@ The protocol exposes far more than basic climate. Currently surfaced:
 | Fault | `binary_sensor` (problem) |
 | Local remote lockout | `switch` |
 
-Vane/air-direction, Lossnay ventilation mode and ATW flow controls are parsed
-by the library and are on the roadmap as entities.
+HACS exposes capability-based vertical vane/air-direction choices through the
+climate swing selector. Complete Lossnay ventilation and ATW controls remain
+on the roadmap; library parsing alone does not establish live control support.
 
 ---
 
