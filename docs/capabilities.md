@@ -24,7 +24,7 @@ promise of support:
 
 Implementation status has a separate meaning:
 
-- **Implemented**: present in the `0.2.0b9` source. Individual device support
+- **Implemented**: present in the `0.2.0b10` source. Individual device support
   and end-to-end acceptance still apply. This is not a claim that every row has
   passed a live control test or that an installation has loaded this version.
 - **Shared library only**: protocol support exists without a complete native HA
@@ -32,7 +32,43 @@ Implementation status has a separate meaning:
 - **Planned**: a candidate requiring implementation, additional protocol
   evidence or a suitable device. It is not currently a supported HA feature.
 
-## Scope of 0.2.0b9
+## Scope of 0.2.0b10
+
+The response-only `ae200.set_local_restrictions` action applies a strict
+boolean patch to one explicitly selected configured `IC` / `NORMAL` / `OLD`
+group. It covers local power, mode, temperature and filter-reset restrictions.
+Omitted functions retain their freshly read effective settings. These are
+local AC operating restrictions, not account permissions, hardware capability
+flags or gates on central HA climate control.
+See [per-function local restrictions](local-restrictions.md).
+
+The shared write lock covers fresh prerequisite reads, a complete five-field
+baseline, effective-state planning and one grouped five-field command. All
+three re-read stop sources must be known false. Effective no-ops send no write.
+Normalised targets avoid reviving dormant `CHK_ON` values hidden by `PERMIT`.
+The action has a controller-wide 15-second cooldown from completion and does
+not alter the legacy summary switch or existing identifiers.
+
+Each invocation returns its own report with baseline, expected raw target,
+status, errors and at most one independent post-send sample. Acknowledgement
+and matching readback remain separate; an uncertain command is not replayed
+or compensated. `after` is an observation with a sample time, not a continuing
+claim about current permissions. A no-op has no post-sample. No new persistent
+transaction cache, entity, automatic action or public raw-restore API is added.
+
+HTTP write timeouts, lost responses and malformed acknowledgements can be
+uncertain after sending begins. Redirects do not resend a POST, explicit
+controller rejection remains failed, and cancellation is not returned as
+success. A matching readback cannot replace a missing acknowledgement.
+
+One idle ordinary group passed a local filter-reset restriction change and
+private exact five-field restoration with acknowledgement/readback checks.
+Other effective restrictions and operating settings were preserved. HA action
+deployment acceptance remains pending, and physical wall-remote buttons were
+not tested. A shared client lock cannot prevent external controller
+writers; no server-side compare-and-set or rollback guarantee is claimed.
+
+## Weekly-pattern scope introduced in 0.2.0b9
 
 The response-only `ae200.read_weekly_pattern` action explicitly selects one
 integration entry, configured group, season 1–5 and pattern 1–7. One minimal
@@ -62,8 +98,10 @@ verified calendar date or next execution.
 
 Static evidence establishes the builder and record model. One minimal live
 websocket GET for one group/season/pattern combination returned zero records
-and passed strict parsing without issues. HA action deployment acceptance
-remains pending. Non-empty actions, activation and execution need their own
+and passed strict parsing without issues. Deployed HA acceptance confirmed
+a fresh successful empty action response matching its cached selector exactly,
+with existing identifiers and automations preserved. Non-empty actions,
+activation and execution need their own
 evidence. An accepted empty response does not establish that other slots are
 empty or scheduling is disabled.
 
@@ -124,7 +162,8 @@ The existing local-remote switch now has four cached effective prohibition
 attributes for local power, mode, temperature and filter reset. Its identifier,
 legacy `RemoCon` on/off interpretation and single-field writes are preserved.
 The on state does not establish that every local function is prohibited, and
-no new per-function restriction write is added. Effective attributes become
+the b6 attributes themselves remain read-only. A separate scoped write action
+is introduced in b10. Effective attributes become
 unknown if the switch is unavailable because the group is stale, its read
 failed or the coordinator update failed; old cached values do not establish
 current local permissions.
@@ -234,7 +273,7 @@ behaviour and diagnostic entities described here apply to HACS.
 | Controller display model and versions | Cached read-only diagnostics in 0.2.0b5 | Official `SystemData` builder and live minimal response structure. | Preserve raw version strings and unknown fields; exclude serial numbers and network settings. This is a setup snapshot, not a periodic firmware monitor. |
 | Licence-status summary | Cached read-only diagnostics in 0.2.0b5 | Official `FunctionList` model and live directory response. | Verify each desired endpoint and connected hardware independently. Active licence status alone proves neither capability nor usable data; raw time limits are not computed expiry dates. |
 | Local remote prohibition summary | Implemented legacy switch; clarified in 0.2.0b6 | Existing `RemoCon` setter and state parser. | Preserve the old identifier and single-field write. Its on state alone does not prove that every local control is prohibited. |
-| Per-function local remote prohibitions | Four cached read-only effective attributes in 0.2.0b6; additional items and writes planned | Official client combines the summary and individual power, mode, temperature and filter-reset items. | Keep missing or unrecognised combinations unknown. These flags restrict local controls; they are not hardware capabilities or gates on HA central commands. |
+| Per-function local remote prohibitions | Read-only effective attributes from 0.2.0b6; scoped four-function write action in 0.2.0b10 | Official effective-state rule, one live filter-reset restriction change and private exact five-field restoration; HA action pending. | Accept the HA action, preserve unrequested effective values and exact restore evidence, and keep ACK/readback/uncertainty distinct. Other functions and physical wall-remote behaviour need separate acceptance. No central-command permission or CAS claim. |
 | Global and group stop context | Explicit read-only diagnostic action in 0.2.0b6 | Official emergency-stop and energy-saving labels, strict minimal requests and live response structures. | Keep global/group freshness and errors separate. Stale typed values remain unknown, and no physical operation, cause, stop clearing or BACnet availability is inferred. |
 | Group members, M-NET addresses and equipment family | Implemented as cached read-only diagnostics in 0.2.0b4 | Official `MnetGroupList` model and live configured membership. | Broaden representative multi-member hardware acceptance before creating additional devices or changing entity relationships. |
 | Detailed equipment identity and capacities | Planned | Address-level models include model, capacity, location and system codes. | Confirm which codes are populated and obtain an authoritative decoding before presenting a model or capacity as fact. |
@@ -243,7 +282,7 @@ behaviour and diagnostic entities described here apply to HACS.
 | Controller schedule flag and availability | Existing read-only diagnostic from 0.2.0b3; label corrected and separate availability attribute added in 0.2.0b9, disabled by default | Cached `Schedule` and `ScheduleAvail` values, with independent raw and nullable availability attributes. | Preserve the existing identifier and state source. Unknown or unavailable data stays unknown; neither flag proves activation, execution, today's records or next-run timing. No schedule write is implemented. |
 | Single-group today schedule | Explicit read-only diagnostic action in 0.2.0b7 | Official `TodayList` model; empty live response; non-empty offline fixtures only. | Accept non-empty plans on suitable equipment before interpreting execution. Preserve unknowns and sample times; no next-run calculation or schedule write. |
 | Controller local clock | Explicit read-only diagnostic action in 0.2.0b8 | Official six-field model, one minimal live GET and deployed HA action/cache acceptance. | Preserve local fields and unknowns. Validate Gregorian date/time before producing an offset-free local datetime; no timezone, DST, drift or atomic schedule-date inference. |
-| Single-group weekly pattern | Explicit read-only diagnostic action in 0.2.0b9 | Official `WPatternList` builder and one single-selector empty live response parsed without issues; HA action acceptance pending. | Accept the HA action, preserve unknowns and independent freshness, and verify non-empty actions separately. No automatic 35-slot scan, activation, execution, clock-date binding or server-capacity claim. |
+| Single-group weekly pattern | Explicit read-only diagnostic action in 0.2.0b9 | Official `WPatternList` builder, one single-selector empty live response and deployed HA action/cache acceptance. | Preserve unknowns and independent freshness, and verify non-empty actions separately. No automatic 35-slot scan, activation, execution, clock-date binding or server-capacity claim. |
 | Yearly patterns, season activation and schedule editing | Planned | Official season, annual-pattern and yearly-directory models. | Establish separately bounded request scopes and activation/precedence semantics. A today or single weekly-pattern sample is not the complete controller schedule. Design editing, backup and recovery separately after read-only acceptance. |
 | Runtime and Thermo-ON time | Planned | Official runtime/account and trend models. | Confirm units, counter resets, bucket boundaries and aggregation before creating HA statistics. |
 | Electrical power, energy, COP and apportionment | Planned | Official energy models and documented licensed functions. | Establish installed metering and licences, data provenance, units and reset semantics. Keep measured, estimated and apportioned energy distinct. |

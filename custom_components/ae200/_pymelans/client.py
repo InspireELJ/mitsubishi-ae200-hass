@@ -6,6 +6,7 @@ import asyncio
 import math
 import re
 import time
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -16,6 +17,7 @@ from . import (
     const,
     control_context,
     controller_clock,
+    local_restrictions,
     metadata,
     protocol,
     today_schedule,
@@ -23,7 +25,12 @@ from . import (
     weekly_pattern,
 )
 from .device import MelansDevice
-from .exceptions import MelansCommandUncertainError, MelansConnectionError, MelansError
+from .exceptions import (
+    MelansCommandUncertainError,
+    MelansConnectionError,
+    MelansError,
+    MelansProtocolError,
+)
 from .transport import HttpTransport, WebsocketTransport
 
 
@@ -94,6 +101,7 @@ class MelansClient:
         self._write_spacing = max(write_spacing, const.MIN_WRITE_SPACING)
         self.stale_after = max(stale_after, const.MIN_POLL_INTERVAL)
         self._last_write = 0.0
+        self._last_local_restriction_request: float | None = None
         self._last_request: float | None = None
         self._last_poll: float | None = None
         self._last_poll_ok = False
@@ -777,38 +785,150 @@ class MelansClient:
         return "online" if available == len(self._names) else "degraded"
 
     async def _write(self, group_id: str, attributes: dict[str, str]) -> None:
-        payload = protocol.build_set_request(group_id, attributes)
+        # Validate before taking the lock, including callers of this legacy API.
+        protocol.build_set_request(group_id, attributes)
         group_id = str(int(group_id))
         async with self._write_lock:
-            delay = self._write_spacing - (time.monotonic() - self._last_write)
-            if delay > 0:
-                await asyncio.sleep(delay)
-            self.last_command = {
-                "group_id": group_id,
-                "attributes": dict(attributes),
-                "at": datetime.now(UTC).isoformat(),
-                "status": "pending",
-            }
+            await self._write_locked(group_id, attributes)
+
+    async def _write_locked(self, group_id: str, attributes: dict[str, str]) -> None:
+        """Write with the caller already holding the shared non-reentrant lock."""
+        payload = protocol.build_set_request(group_id, attributes)
+        delay = self._write_spacing - (time.monotonic() - self._last_write)
+        if delay > 0:
+            await asyncio.sleep(delay)
+        self.last_command = {
+            "group_id": group_id,
+            "attributes": dict(attributes),
+            "at": datetime.now(UTC).isoformat(),
+            "status": "pending",
+        }
+        response = None
+        try:
             try:
                 response = await self._request(payload)
                 protocol.parse_acknowledgement(response)
-            except MelansError as err:
-                uncertain = isinstance(err, MelansCommandUncertainError)
-                self.last_command["status"] = "outcome_unknown" if uncertain else "failed"
-                self.last_command["error_type"] = type(err).__name__
-                self.last_command["error_code"] = getattr(err, "code", None)
-                if uncertain:
-                    # The controller may have acted. Observe through the normal
-                    # bounded readback path, but never invent an acknowledgement.
-                    self._pending_writes.pop(group_id, None)
-                    self._readback_requested = True
+            except MelansProtocolError as error:
+                if response is None or not protocol.is_explicit_write_rejection(response):
+                    raise MelansCommandUncertainError(
+                        "command response could not establish acceptance or rejection"
+                    ) from error
                 raise
-            finally:
-                self._last_write = time.monotonic()
-            self._group_write_ack_at[group_id] = time.perf_counter()
-            self.last_command["status"] = "accepted_unconfirmed"
-            self._pending_writes.setdefault(group_id, {}).update(attributes)
+        except asyncio.CancelledError:
+            # Cancellation after entering the request does not prove that the
+            # controller received nothing. Keep uncertainty and propagate it.
+            self.last_command["status"] = "outcome_unknown"
+            self.last_command["error_type"] = "CancelledError"
+            self.last_command["error_code"] = None
+            self._pending_writes.pop(group_id, None)
             self._readback_requested = True
+            raise
+        except MelansError as err:
+            uncertain = isinstance(err, MelansCommandUncertainError)
+            self.last_command["status"] = "outcome_unknown" if uncertain else "failed"
+            self.last_command["error_type"] = type(err).__name__
+            self.last_command["error_code"] = self._optional_read_error(err)["code"]
+            if uncertain:
+                # Sending may have succeeded. Observe without inventing an ACK.
+                self._pending_writes.pop(group_id, None)
+                self._readback_requested = True
+            raise
+        finally:
+            self._last_write = time.monotonic()
+        self._group_write_ack_at[group_id] = time.perf_counter()
+        self.last_command["status"] = "accepted_unconfirmed"
+        self._pending_writes.setdefault(group_id, {}).update(attributes)
+        self._readback_requested = True
+
+    def _local_restriction_device(self, group: str) -> MelansDevice:
+        device = self.devices.get(group)
+        if group not in self._names or device is None:
+            raise ValueError("select one configured group for local restrictions")
+        if not self.is_group_available(group):
+            raise ValueError("local restrictions require a fresh available group")
+        if any(device.capability_attributes.get(key) != value for key, value in (
+            ("Model", "IC"), ("IcKind", "NORMAL"), ("GroupType", "OLD"),
+        )):
+            raise ValueError("local restrictions require a known OLD NORMAL IC group")
+        return device
+
+    async def async_set_local_restrictions(
+        self, group_id: str | int, patch: Mapping[str, bool],
+    ) -> dict[str, Any]:
+        """Merge one explicit wall-remote patch, with fresh guards and one readback.
+
+        The shared write lock protects local read/merge/write sequencing. There
+        is no controller compare-and-swap, so external actors can still race.
+        No failure triggers a replay, rollback or compensating write.
+        """
+        group = topology._identifier(group_id, const.MAX_GROUPS)
+        requested = local_restrictions.validate_local_restriction_patch(patch)
+        self._local_restriction_device(group)
+        async with self._write_lock:
+            if (
+                self._last_local_restriction_request is not None
+                and time.monotonic() - self._last_local_restriction_request < const.MIN_POLL_INTERVAL
+            ):
+                raise ValueError("local restriction changes are cooling down; wait at least 15 seconds")
+            device = self._local_restriction_device(group)
+            try:
+                global_stop = await self._request(control_context.build_global_control_context_request())
+                group_stops = await self._request(control_context.build_group_control_context_request(group))
+                stops = local_restrictions.parse_local_restriction_stops(
+                    global_stop, group_stops, expected_group=group,
+                )
+                if any(stops.values()):
+                    raise ValueError("local restrictions cannot change while a stop source is active")
+                response = await self._request(local_restrictions.build_local_restrictions_request(group))
+                baseline = local_restrictions.parse_local_restrictions(response, expected_group=group)
+                device = self._local_restriction_device(group)
+                plan = local_restrictions.plan_local_restrictions_patch(
+                    baseline, requested, capability_attributes=device.capability_attributes,
+                )
+                report = {
+                    "group_id": group, "at": datetime.now(UTC).isoformat(),
+                    "status": "no_change", "requested": dict(requested),
+                    "before_raw": baseline.raw_attributes(), "before": plan.before,
+                    "expected_raw": plan.write_attributes(),
+                    "after_raw": {}, "after": None, "readback_at": None,
+                    "readback_matches": None, "error": None,
+                    "write_error": None, "readback_error": None,
+                }
+                if plan.before == plan.after:
+                    # Keep dormant raw bits exactly as observed for a no-op.
+                    report["expected_raw"] = baseline.raw_attributes()
+                    return report
+                acknowledged = False
+                try:
+                    await self._write_locked(group, plan.write_attributes())
+                except MelansError as error:
+                    report["write_error"] = self._optional_read_error(error)
+                    report["error"] = dict(report["write_error"])
+                    report["status"] = "outcome_unknown" if isinstance(error, MelansCommandUncertainError) else "failed"
+                    if report["status"] == "failed":
+                        return report
+                else:
+                    acknowledged = True
+                    report["status"] = "accepted_unconfirmed"
+                # Exactly one independent post-send observation, even if an ACK
+                # was lost. Matching state cannot turn uncertainty into an ACK.
+                try:
+                    sampled_at = time.perf_counter()
+                    response = await self._request(local_restrictions.build_local_restrictions_request(group))
+                    after = local_restrictions.parse_local_restrictions(response, expected_group=group)
+                except MelansError as error:
+                    report["readback_error"] = self._optional_read_error(error)
+                    report["error"] = report["error"] or dict(report["readback_error"])
+                else:
+                    report.update(after_raw=after.raw_attributes(), after=after.effective(),
+                                  readback_at=datetime.now(UTC).isoformat(),
+                                  readback_matches=after.raw_attributes() == plan.write_attributes())
+                    if acknowledged:
+                        self._confirm_readback(group, after.raw_attributes(), sampled_at=sampled_at)
+                        report["status"] = "confirmed" if report["readback_matches"] else "not_yet_confirmed"
+                return report
+            finally:
+                self._last_local_restriction_request = time.monotonic()
 
     async def set_climate(
         self,

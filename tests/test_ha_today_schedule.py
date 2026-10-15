@@ -16,7 +16,7 @@ import voluptuous as vol
 ROOT = Path(__file__).resolve().parents[1]
 ACTION_NAMES = {
     "read_member", "read_control_context", "read_today_schedule", "read_controller_clock",
-    "read_weekly_pattern",
+    "read_weekly_pattern", "set_local_restrictions",
 }
 
 
@@ -109,7 +109,7 @@ def test_all_actions_register_independently_and_idempotently(schedule_service, p
     c.services.async_setup_services(c.hass)
 
     assert set(c.hass.services.registered) == {("ae200", name) for name in ACTION_NAMES}
-    assert c.hass.services.registrations == 5 - len(preexisting)
+    assert c.hass.services.registrations == 6 - len(preexisting)
     for name in ACTION_NAMES:
         registered = c.hass.services.registered["ae200", name]
         if name in sentinels:

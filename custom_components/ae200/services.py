@@ -1,4 +1,4 @@
-"""Explicit, bounded diagnostic actions for a selected AE-200 controller."""
+"""Explicit, bounded actions for a selected AE-200 controller."""
 
 from __future__ import annotations
 
@@ -16,11 +16,18 @@ SERVICE_READ_CONTROL_CONTEXT = "read_control_context"
 SERVICE_READ_TODAY_SCHEDULE = "read_today_schedule"
 SERVICE_READ_CONTROLLER_CLOCK = "read_controller_clock"
 SERVICE_READ_WEEKLY_PATTERN = "read_weekly_pattern"
+SERVICE_SET_LOCAL_RESTRICTIONS = "set_local_restrictions"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 ATTR_ADDRESS = "address"
 ATTR_GROUP_ID = "group_id"
 ATTR_SEASON = "season"
 ATTR_PATTERN = "pattern"
+_LOCAL_RESTRICTION_FIELDS = {
+    "power_prohibited": "power",
+    "mode_prohibited": "mode",
+    "temperature_prohibited": "temperature",
+    "filter_reset_prohibited": "filter_reset",
+}
 
 
 def _member_address(value: Any) -> int:
@@ -94,6 +101,28 @@ READ_WEEKLY_PATTERN_SCHEMA = vol.Schema(
         vol.Required(ATTR_SEASON): _season,
         vol.Required(ATTR_PATTERN): _pattern,
     }
+)
+
+
+def _strict_bool(value: Any) -> bool:
+    if type(value) is not bool:
+        raise vol.Invalid("local restrictions must be true or false booleans")
+    return value
+
+
+def _require_local_patch(data: dict[str, Any]) -> dict[str, Any]:
+    if not any(field in data for field in _LOCAL_RESTRICTION_FIELDS):
+        raise vol.Invalid("at least one local restriction must be supplied")
+    return data
+
+
+SET_LOCAL_RESTRICTIONS_SCHEMA = vol.All(
+    vol.Schema({
+        vol.Required(ATTR_CONFIG_ENTRY_ID): vol.All(str, vol.Length(min=1)),
+        vol.Required(ATTR_GROUP_ID): _group_id,
+        **{vol.Optional(field): _strict_bool for field in _LOCAL_RESTRICTION_FIELDS},
+    }),
+    _require_local_patch,
 )
 
 
@@ -211,6 +240,27 @@ def async_setup_services(hass: HomeAssistant) -> None:
         # a weekday assignment or a prediction of the next execution.
         return pattern
 
+    async def async_set_local_restrictions(call: ServiceCall) -> ServiceResponse:
+        coordinator = _entry_coordinator(hass, call.data[ATTR_CONFIG_ENTRY_ID])
+        patch = {key: call.data[field] for field, key in _LOCAL_RESTRICTION_FIELDS.items()
+                 if field in call.data}
+        try:
+            report = await coordinator.client.async_set_local_restrictions(
+                call.data[ATTR_GROUP_ID], patch
+            )
+        except ValueError as err:
+            raise ServiceValidationError(str(err)) from err
+        except MelansError as err:
+            raise HomeAssistantError("The AE-200 local restriction change failed") from err
+        if not isinstance(report, dict) or report.get("status") not in (
+            "no_change", "confirmed", "accepted_unconfirmed", "not_yet_confirmed",
+            "outcome_unknown", "failed",
+        ):
+            raise HomeAssistantError("The AE-200 change did not produce a local restriction report")
+        # This report belongs to this transaction. Failed or uncertain outcomes
+        # remain visible and never trigger another write, read or refresh here.
+        return report
+
     if not hass.services.has_service(DOMAIN, SERVICE_READ_MEMBER):
         hass.services.async_register(
             DOMAIN,
@@ -249,5 +299,13 @@ def async_setup_services(hass: HomeAssistant) -> None:
             SERVICE_READ_WEEKLY_PATTERN,
             async_read_weekly_pattern,
             schema=READ_WEEKLY_PATTERN_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_SET_LOCAL_RESTRICTIONS):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_LOCAL_RESTRICTIONS,
+            async_set_local_restrictions,
+            schema=SET_LOCAL_RESTRICTIONS_SCHEMA,
             supports_response=SupportsResponse.ONLY,
         )

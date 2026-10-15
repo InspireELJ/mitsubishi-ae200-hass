@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-This source targets the `0.2.0b9` on-demand weekly-pattern pilot.
+This source targets the `0.2.0b10` per-function local-restrictions pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -60,14 +60,26 @@ The parser retains 18 raw fields and rejects responses exceeding its
 24-record receive boundary rather than truncating them. That boundary is
 not a claim about server capacity. There is no automatic 35-combination scan,
 pattern activation, schedule write or clock-date association. One minimal live
-GET returned an empty pattern and passed parsing without issues; HA action
-deployment and non-empty plans remain subject to acceptance. See
+GET returned an empty pattern and passed parsing without issues. Deployed HA
+acceptance confirmed a fresh empty action response matching its cache;
+non-empty plans and execution remain subject to acceptance. See
 [weekly-pattern diagnostics](docs/weekly-pattern.md).
 
 The existing default-disabled schedule diagnostic keeps its identifier and
 `Schedule`-based state. Its corrected name is *Controller schedule flag*, with
 a separate cached `schedule_available` attribute from `ScheduleAvail` while the
 entity is available. Neither flag proves that a pattern is active or executing.
+
+Version `0.2.0b10` adds a response-only action to change selected local remote
+functions for one known ordinary `IC` / `NORMAL` / `OLD` group. Strict boolean
+fields merge against fresh effective restrictions, with fresh stop checks,
+one five-field command and one bounded readback. No-op requests do not write;
+acknowledgements, observed values and uncertain outcomes remain distinct.
+The legacy switch and existing identifiers are preserved. A limited live
+filter-reset restriction change and exact five-field restoration passed
+acknowledgement/readback checks with operating settings preserved. HA action
+acceptance remains pending; physical wall-remote buttons were not tested. See
+[per-function local restrictions](docs/local-restrictions.md).
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts

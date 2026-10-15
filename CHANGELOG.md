@@ -3,6 +3,38 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0b10] - 2026-10-16
+
+### Added
+- Response-only `ae200.set_local_restrictions` action for one explicit entry
+  and configured `IC` / `NORMAL` / `OLD` group. A strict boolean patch changes
+  selected local power, mode, temperature or filter-reset permissions while
+  preserving the unrequested effective restrictions.
+- Shared-write-lock prerequisite reads, a complete five-field baseline and
+  one grouped five-field command. All three freshly read stop flags must be
+  known false. Effective no-ops send no write and do not fabricate a post-read.
+- A report for this invocation separates acknowledgement, one bounded
+  post-send sample and uncertainty. It adds no persistent transaction cache,
+  automatic retry, compensation, public raw-restore service or new entity.
+
+### Fixed
+- Treat HTTP write timeouts, lost responses and malformed acknowledgements as
+  uncertain where a write may have begun. Do not follow redirects that could
+  resend a POST or replay an uncertain command. Explicit rejection remains a
+  failure, and cancellation propagates without being presented as success.
+
+### Validation scope
+- One idle ordinary group passed a local filter-reset restriction change with
+  acknowledgement and matching five-field readback. Unrequested effective
+  restrictions and operating settings were preserved, and the original five
+  raw fields and operating state were restored and checked. Deployed HA action
+  acceptance remains pending; physical wall-remote buttons were not tested.
+- Shared locks do not provide a controller-side compare-and-set guarantee
+  against external writers.
+- The legacy `RemoCon` switch, cached effective attributes, existing identifiers
+  and central climate controls are preserved. Changing a local filter-reset
+  restriction does not reset the filter reminder or clear a fault.
+
 ## [0.2.0b9] - 2026-10-16
 
 ### Added
@@ -25,9 +57,10 @@ All notable changes to this project are documented here. The format is based on
 
 ### Validation scope
 - One minimal live websocket GET for one group/season/pattern combination
-  returned zero records and passed strict parsing without issues. HA action
-  deployment acceptance remains pending; non-empty actions, activation and
-  execution have not passed live acceptance.
+  returned zero records and passed strict parsing without issues. Deployed HA
+  acceptance also confirmed a fresh successful empty response matching the
+  cached selector exactly, with identifiers and automations preserved.
+  Non-empty actions, activation and execution have not passed live acceptance.
 - The receive cap is a local protection based on the official editor; it is
   not a server-capacity or pagination guarantee. Zero returned records do not
   prove that scheduling is disabled, unsupported or inactive today.

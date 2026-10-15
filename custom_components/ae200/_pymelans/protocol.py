@@ -127,14 +127,38 @@ def build_capability_request(group_ids: Iterable[str | int]) -> str:
     return _XML_DECL + ET.tostring(root, encoding="unicode")
 
 
+def is_explicit_write_rejection(payload: str) -> bool:
+    """Distinguish a controller rejection from an unverifiable write response."""
+    if len(payload) > 1024 * 1024 or re.search(
+        r"<!\s*(?:DOCTYPE|ENTITY)\b", payload, re.IGNORECASE,
+    ):
+        return False
+    try:
+        root = ET.fromstring(payload)
+    except ET.ParseError:
+        return False
+    commands = root.findall("./Command")
+    if root.tag != "Packet" or len(commands) != 1 or len(commands[0]):
+        return False
+    command = root.findtext("./Command")
+    return command == "setErrorResponse" or (
+        command == "setResponse" and root.find(".//ERROR") is not None
+    )
+
+
 def parse_acknowledgement(payload: str) -> None:
     """Reject error and malformed replies before reporting a write as accepted."""
+    if len(payload) > 1024 * 1024 or re.search(
+        r"<!\s*(?:DOCTYPE|ENTITY)\b", payload, re.IGNORECASE,
+    ):
+        raise MelansProtocolError("oversized acknowledgement or unsupported XML declaration")
     try:
         root = ET.fromstring(payload)
     except ET.ParseError as exc:
         raise MelansProtocolError(f"invalid acknowledgement XML: {exc}") from exc
     _raise_for_error(root)
-    if root.tag != "Packet" or root.findtext("./Command") != "setResponse":
+    commands = root.findall("./Command")
+    if root.tag != "Packet" or len(commands) != 1 or len(commands[0]) or commands[0].text != "setResponse":
         raise MelansProtocolError("expected a setResponse acknowledgement")
 
 
