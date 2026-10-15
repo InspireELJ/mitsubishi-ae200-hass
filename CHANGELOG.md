@@ -3,6 +3,34 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1b2] - 2026-10-16
+
+### Added
+- A pure offline profile and combined-command planner for an exact ordinary
+  `IC` / empty `SubModel` / `NORMAL` / `NEW` / `ONE_SETPOINT` capability set.
+  Complete reported ranges, recognised mode switches and a known Celsius step
+  are required. The planner validates all inputs before returning immutable
+  mode-specific attributes; it performs no I/O and is not connected to SET.
+
+### Fixed
+- Resolve a supported NEW group's cached target using its raw mode:
+  `SetTemp1` for COOL/DRY, `SetTemp2` for HEAT and `SetTemp3` for AUTO.
+  Invalid or unsupported profiles and values remain unknown, with no legacy
+  `SetTemp` fallback, rounding or clamping. OLD reads are preserved.
+
+### Validation scope
+- Offline tests cover profiles, ranges, precision, field selection, immutable
+  plans and HA/device read contracts. No representative live NEW sample,
+  temperature write, readback or restoration has been accepted.
+- Public NEW temperature writes remain blocked, including compound requests,
+  and HA continues to hide their temperature-control feature. This release
+  does not expand entity classification, advertised modes, TWO_SETPOINT,
+  SETBACK, device families or physical running-state inference.
+- The preceding `0.2.1b1` deployed HA runtime diagnostic has now passed explicit
+  `FAN_TIME` and `THERMO_TIME` action/cache acceptance for one member and day.
+  Each reported 48 zero tokens; collection and measurement validity remain
+  unverified. Existing identifiers, permissions and automations were retained.
+
 ## [0.2.1b1] - 2026-10-16
 
 ### Added

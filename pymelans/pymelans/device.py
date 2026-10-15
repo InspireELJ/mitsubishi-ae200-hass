@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import math
 
-from . import capabilities, const
+from . import capabilities, const, new_single_setpoint
 
 
 def _to_float(value: str | None) -> float | None:
@@ -141,6 +141,12 @@ class MelansDevice:
 
     @property
     def target_temperature(self) -> float | None:
+        if self.capability_attributes.get("GroupType") == "NEW":
+            # NEW uses mode-specific fields. Unsupported or incomplete NEW
+            # profiles must never fall back to the unrelated legacy SetTemp.
+            return new_single_setpoint.read_new_single_setpoint_temperature(
+                self.capability_attributes, self._attrs
+            )
         return _to_float(self.raw("SetTemp"))
 
     @property
