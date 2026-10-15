@@ -24,7 +24,7 @@ promise of support:
 
 Implementation status has a separate meaning:
 
-- **Implemented**: present in the `0.2.0b7` source. Individual device support
+- **Implemented**: present in the `0.2.0b8` source. Individual device support
   and end-to-end acceptance still apply. This is not a claim that every row has
   passed a live control test or that an installation has loaded this version.
 - **Shared library only**: protocol support exists without a complete native HA
@@ -32,7 +32,25 @@ Implementation status has a separate meaning:
 - **Planned**: a candidate requiring implementation, additional protocol
   evidence or a suitable device. It is not currently a supported HA feature.
 
-## Scope of 0.2.0b7
+## Scope of 0.2.0b8
+
+The response-only `ae200.read_controller_clock` action reads six local-clock
+fields for one explicitly selected integration entry. It retains independent
+attempt and successful-read times, errors and freshness, with a controller-wide
+15-second cooldown from completion. There is no setup read, periodic clock
+poll, new entity, clock write or time synchronisation.
+See [controller-clock diagnostics](controller-clock.md).
+
+Only a fresh, successful sample representing a valid Gregorian date and time
+produces `local_datetime`, without an offset. Expired or failed samples retain
+historical raw values while the typed datetime becomes unknown. No UTC offset,
+daylight-saving rule or clock drift is inferred. One minimal live Clock GET
+returned all six fields and passed strict parsing without issues; HA action
+deployment acceptance remains pending.
+A clock read and a separate `TodayList` read are not atomic and do not establish
+that a schedule snapshot belongs to a verified date.
+
+## Today-schedule scope introduced in 0.2.0b7
 
 The response-only `ae200.read_today_schedule` action reads one configured
 group's `ScheduleControl/TodayList` on explicit request. It retains an independent
@@ -176,6 +194,7 @@ behaviour and diagnostic entities described here apply to HACS.
 | Active fault codes and fault history | Planned | Official address-level alarm fields and `AlarmList` request/parser models. | Confirm active versus recovered records, timestamps, bounded history size and code interpretation. Keep reset/clear operations separate from monitoring. |
 | Controller schedule enabled flag | Implemented read-only diagnostic in 0.2.0b3, disabled by default | Existing cached `Schedule` values and offline entity contracts. | A valid ON/OFF flag describes enabled status, not whether an action is currently running. No schedule write is implemented. |
 | Single-group today schedule | Explicit read-only diagnostic action in 0.2.0b7 | Official `TodayList` model; empty live response; non-empty offline fixtures only. | Accept non-empty plans on suitable equipment before interpreting execution. Preserve unknowns and sample times; no next-run calculation or schedule write. |
+| Controller local clock | Explicit read-only diagnostic action in 0.2.0b8 | Official six-field model and one minimal live GET parsed without issues; HA action deployment acceptance pending. | Preserve local fields and unknowns. Validate Gregorian date/time before producing an offset-free local datetime; no timezone, DST, drift or atomic schedule-date inference. |
 | Weekly/yearly schedules and schedule editing | Planned | Official weekly season/pattern and yearly models. | Establish explicit bounded request scopes and time semantics, document precedence with HA automations, then design editing, backup and recovery separately. A today snapshot is not the complete controller schedule. |
 | Runtime and Thermo-ON time | Planned | Official runtime/account and trend models. | Confirm units, counter resets, bucket boundaries and aggregation before creating HA statistics. |
 | Electrical power, energy, COP and apportionment | Planned | Official energy models and documented licensed functions. | Establish installed metering and licences, data provenance, units and reset semantics. Keep measured, estimated and apportioned energy distinct. |
@@ -275,8 +294,9 @@ hardware functions solely because local controls are prohibited.
    fault detail and actual operating-state entities with explicit unknown
    handling. Define aggregation where several indoor units share one group.
 3. Accept the controller identity and licence summaries added in `0.2.0b5` and
-   the explicit today snapshot added in `0.2.0b7`, then develop weekly/yearly
-   schedule inspection and bounded fault history. Refresh static metadata
+   the explicit today snapshot added in `0.2.0b7` and local-clock snapshot in
+   `0.2.0b8`, then develop weekly/yearly schedule inspection and bounded fault
+   history. Clock and schedule reads are separate samples. Refresh static metadata
    separately from operational state. A server-side history bound
    must be established before introducing a history request; local truncation
    alone does not bound controller work.

@@ -14,7 +14,7 @@ import pytest
 import voluptuous as vol
 
 ROOT = Path(__file__).resolve().parents[1]
-ACTION_NAMES = {"read_member", "read_control_context", "read_today_schedule"}
+ACTION_NAMES = {"read_member", "read_control_context", "read_today_schedule", "read_controller_clock"}
 
 
 @pytest.fixture
@@ -106,7 +106,7 @@ def test_all_three_actions_register_independently_and_idempotently(schedule_serv
     c.services.async_setup_services(c.hass)
 
     assert set(c.hass.services.registered) == {("ae200", name) for name in ACTION_NAMES}
-    assert c.hass.services.registrations == 3 - len(preexisting)
+    assert c.hass.services.registrations == 4 - len(preexisting)
     for name in ACTION_NAMES:
         registered = c.hass.services.registered["ae200", name]
         if name in sentinels:
@@ -249,6 +249,7 @@ def test_today_schedule_action_fields_have_matching_translations():
     assert set(action["fields"]) == {"config_entry_id", "group_id"}
     assert all(field["name"] and field["description"] for field in action["fields"].values())
     yaml = (component / "services.yaml").read_text().split("read_today_schedule:\n", 1)[1]
+    yaml = yaml.split("read_controller_clock:\n", 1)[0]
     assert "config_entry:" in yaml and "integration: ae200" in yaml
     assert "min: 1" in yaml and "max: 50" in yaml
     assert yaml.count("required: true") == 2

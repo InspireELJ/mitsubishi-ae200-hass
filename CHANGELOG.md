@@ -3,6 +3,25 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0b8] - 2026-10-16
+
+### Added
+- Response-only `ae200.read_controller_clock` action for an explicitly selected
+  configuration entry. One minimal six-field clock read supplies an independent
+  diagnostic cache with a controller-wide 15-second cooldown from completion.
+- Raw local-clock fields and a nullable `local_datetime` for a fresh, valid
+  Gregorian date and time. Errors and expiry preserve historical raw fields
+  while making the typed value unknown.
+
+### Validation scope
+- One minimal live Clock GET returned all six fields and passed strict parsing
+  without issues. HA action deployment acceptance remains pending. Clock values
+  do not establish a UTC offset, daylight-saving rules, clock drift or a verified
+  time synchronisation source.
+- No setup read, periodic clock poll, entity, clock write or time synchronisation
+  is added. A separate clock read and `TodayList` read are not an atomic sample
+  and do not bind a schedule snapshot to a verified calendar date.
+
 ## [0.2.0b7] - 2026-10-16
 
 ### Added

@@ -46,3 +46,10 @@ read_today_schedule:
           max: 50
           step: 1
           mode: box
+read_controller_clock:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: ae200

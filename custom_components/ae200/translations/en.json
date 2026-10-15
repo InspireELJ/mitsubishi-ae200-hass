@@ -30,6 +30,16 @@
     }
   },
   "services": {
+    "read_controller_clock": {
+      "name": "Read controller clock",
+      "description": "Read the controller's local wall clock on demand. Returns a snapshot with its own data quality and no inferred time zone. Reads share a minimum 15 second interval.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Controller",
+          "description": "The AE-200 configuration entry to read from. Select it explicitly even when only one controller is configured."
+        }
+      }
+    },
     "read_today_schedule": {
       "name": "Read today's schedule",
       "description": "Read today's controller schedule for one configured group on demand. Returns a snapshot, including an empty schedule, without predicting the next execution. Reads share a minimum 15 second interval.",

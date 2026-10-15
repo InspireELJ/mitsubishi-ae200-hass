@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-The company `main` branch contains the `0.2.0b7` on-demand today-schedule pilot.
+This source targets the `0.2.0b8` on-demand controller-clock pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -40,6 +40,15 @@ Version `0.2.0b7` adds an explicit read-only action for one configured group's
 no automatic query, periodic polling, schedule editing or next-run inference.
 Live acceptance currently covers an empty list; non-empty plans remain subject
 to validation. See [today-schedule diagnostics](docs/today-schedule.md).
+
+Version `0.2.0b8` adds an explicit read-only controller-clock action with an
+independent six-field local-time snapshot and cooldown. A fresh, valid date
+can produce an offset-free local datetime; timezone, daylight-saving and clock
+drift remain unknown. Clock and schedule reads are separate samples. There is
+no automatic query, periodic clock poll, new entity or time synchronisation.
+One minimal live Clock GET confirmed the six-field response and passed parsing
+without issues; HA action deployment acceptance remains pending. See
+[controller-clock diagnostics](docs/controller-clock.md).
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts

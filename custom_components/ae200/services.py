@@ -14,6 +14,7 @@ from .const import DOMAIN
 SERVICE_READ_MEMBER = "read_member"
 SERVICE_READ_CONTROL_CONTEXT = "read_control_context"
 SERVICE_READ_TODAY_SCHEDULE = "read_today_schedule"
+SERVICE_READ_CONTROLLER_CLOCK = "read_controller_clock"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 ATTR_ADDRESS = "address"
 ATTR_GROUP_ID = "group_id"
@@ -58,6 +59,9 @@ READ_CONTROL_CONTEXT_SCHEMA = vol.Schema(
     }
 )
 READ_TODAY_SCHEDULE_SCHEMA = READ_CONTROL_CONTEXT_SCHEMA
+READ_CONTROLLER_CLOCK_SCHEMA = vol.Schema(
+    {vol.Required(ATTR_CONFIG_ENTRY_ID): vol.All(str, vol.Length(min=1))}
+)
 
 
 def _entry_coordinator(hass: HomeAssistant, entry_id: str) -> Any:
@@ -134,6 +138,25 @@ def async_setup_services(hass: HomeAssistant) -> None:
         # It does not update entities or infer the next scheduled execution.
         return schedule
 
+    async def async_read_controller_clock(call: ServiceCall) -> ServiceResponse:
+        coordinator = _entry_coordinator(hass, call.data[ATTR_CONFIG_ENTRY_ID])
+        try:
+            clock = await coordinator.client.async_read_controller_clock()
+        except ValueError as err:
+            raise ServiceValidationError(str(err)) from err
+        except MelansError as err:
+            raise HomeAssistantError("The AE-200 controller clock read failed") from err
+        if isinstance(clock, dict) and clock.get("read_status") == "cooldown":
+            raise HomeAssistantError(
+                "The AE-200 controller clock read is cooling down. "
+                "Wait at least 15 seconds before another controller clock read"
+            )
+        if not isinstance(clock, dict) or clock.get("read_status") not in ("updated", "error"):
+            raise HomeAssistantError("The AE-200 read did not produce a controller clock sample")
+        # The client exports an allowlisted local wall-clock snapshot. Its
+        # independent quality is preserved without inferring a time zone.
+        return clock
+
     if not hass.services.has_service(DOMAIN, SERVICE_READ_MEMBER):
         hass.services.async_register(
             DOMAIN,
@@ -156,5 +179,13 @@ def async_setup_services(hass: HomeAssistant) -> None:
             SERVICE_READ_TODAY_SCHEDULE,
             async_read_today_schedule,
             schema=READ_TODAY_SCHEDULE_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_READ_CONTROLLER_CLOCK):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_READ_CONTROLLER_CLOCK,
+            async_read_controller_clock,
+            schema=READ_CONTROLLER_CLOCK_SCHEMA,
             supports_response=SupportsResponse.ONLY,
         )
