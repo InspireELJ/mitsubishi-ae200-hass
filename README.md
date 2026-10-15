@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-The company `main` branch contains the `0.2.0b6` control-context diagnostics pilot.
+The company `main` branch contains the `0.2.0b7` on-demand today-schedule pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -34,6 +34,12 @@ prohibition attributes and adds an explicit read-only control-context action.
 It reads global and group stop flags on demand, with independent freshness,
 partial-error reporting and a controller-wide cooldown. See
 [local restrictions and control context](docs/control-context.md).
+
+Version `0.2.0b7` adds an explicit read-only action for one configured group's
+`TodayList` schedule snapshot. It preserves raw actions and sample times, with
+no automatic query, periodic polling, schedule editing or next-run inference.
+Live acceptance currently covers an empty list; non-empty plans remain subject
+to validation. See [today-schedule diagnostics](docs/today-schedule.md).
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts
@@ -116,6 +122,9 @@ dedicated settings page often prefer the **add-on**.
 - **On-demand control context** in HACS: explicitly read a configured group's
   global emergency-stop, BACnet emergency-stop and energy-saving stop flags.
   These diagnostics add no automatic polling or gate on central HA commands.
+- **On-demand today schedule** in HACS: explicitly read one configured group's
+  returned plan records. An empty list is not proof that scheduling is disabled,
+  and a plan does not describe physical running state.
 - **100% local**. No cloud, no account, no telemetry.
 
 ---

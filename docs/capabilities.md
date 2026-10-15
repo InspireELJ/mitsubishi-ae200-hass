@@ -24,7 +24,7 @@ promise of support:
 
 Implementation status has a separate meaning:
 
-- **Implemented**: present in the `0.2.0b6` source. Individual device support
+- **Implemented**: present in the `0.2.0b7` source. Individual device support
   and end-to-end acceptance still apply. This is not a claim that every row has
   passed a live control test or that an installation has loaded this version.
 - **Shared library only**: protocol support exists without a complete native HA
@@ -32,7 +32,27 @@ Implementation status has a separate meaning:
 - **Planned**: a candidate requiring implementation, additional protocol
   evidence or a suitable device. It is not currently a supported HA feature.
 
-## Scope of 0.2.0b6
+## Scope of 0.2.0b7
+
+The response-only `ae200.read_today_schedule` action reads one configured
+group's `ScheduleControl/TodayList` on explicit request. It retains an independent
+snapshot, sample times, errors and raw plan fields. There is no setup query,
+periodic schedule poll, new entity, schedule write or automation change.
+See [today-schedule diagnostics](today-schedule.md).
+
+Only the empty-list response structure has live acceptance. Non-empty records
+are covered by offline fixtures but have not been accepted on live equipment.
+The parser uses the official web editor's 24-record limit as a receive boundary,
+rejecting an oversized response rather than silently truncating it. That
+boundary is not proof of server capacity or a server-side record-count limit.
+
+Hours and minutes can be validated, but the response supplies no verified date
+or timezone from which to compute UTC events, execution order or a next run.
+Empty actions mean no control of that field; wildcard and future action tokens
+remain unknown. An empty list is zero returned records, not proof that
+scheduling is disabled or unsupported. Plans do not establish running state.
+
+## Control-context scope introduced in 0.2.0b6
 
 The existing local-remote switch now has four cached effective prohibition
 attributes for local power, mode, temperature and filter reset. Its identifier,
@@ -155,7 +175,8 @@ behaviour and diagnostic entities described here apply to HACS.
 | Actual Thermo-ON, fan and defrost state | Raw on-demand member diagnostics in 0.2.0b4; operational entities planned | Complete live ThermoStatus/FanStatus strings and a fan-only test. DefrostStatus rejected by pilot firmware. | Validate XML value semantics and group aggregation. Power on and a cooling mode do not prove active cooling or compressor operation. |
 | Active fault codes and fault history | Planned | Official address-level alarm fields and `AlarmList` request/parser models. | Confirm active versus recovered records, timestamps, bounded history size and code interpretation. Keep reset/clear operations separate from monitoring. |
 | Controller schedule enabled flag | Implemented read-only diagnostic in 0.2.0b3, disabled by default | Existing cached `Schedule` values and offline entity contracts. | A valid ON/OFF flag describes enabled status, not whether an action is currently running. No schedule write is implemented. |
-| Full controller schedule contents and editing | Planned | Official weekly season/pattern, yearly and today's schedule models. | Start with read-only inspection, document precedence with HA automations, then design explicit editing, backup and recovery. The current flags are not a complete schedule. |
+| Single-group today schedule | Explicit read-only diagnostic action in 0.2.0b7 | Official `TodayList` model; empty live response; non-empty offline fixtures only. | Accept non-empty plans on suitable equipment before interpreting execution. Preserve unknowns and sample times; no next-run calculation or schedule write. |
+| Weekly/yearly schedules and schedule editing | Planned | Official weekly season/pattern and yearly models. | Establish explicit bounded request scopes and time semantics, document precedence with HA automations, then design editing, backup and recovery separately. A today snapshot is not the complete controller schedule. |
 | Runtime and Thermo-ON time | Planned | Official runtime/account and trend models. | Confirm units, counter resets, bucket boundaries and aggregation before creating HA statistics. |
 | Electrical power, energy, COP and apportionment | Planned | Official energy models and documented licensed functions. | Establish installed metering and licences, data provenance, units and reset semantics. Keep measured, estimated and apportioned energy distinct. |
 | Lossnay and ventilation | Shared library only for partial parsing; complete HA control planned | Official ventilation capability flags and enum algorithms. | Obtain meaningful data from a ventilation installation. AC placeholder fields cannot establish Lossnay support. |
@@ -253,9 +274,10 @@ hardware functions solely because local controls are prohibited.
 2. Add read-only group membership and address-level status. Use this to develop
    fault detail and actual operating-state entities with explicit unknown
    handling. Define aggregation where several indoor units share one group.
-3. Accept the controller identity and licence summaries added in `0.2.0b5`, then
-   develop schedule inspection and bounded fault history. Refresh static
-   metadata separately from operational state. A server-side history bound
+3. Accept the controller identity and licence summaries added in `0.2.0b5` and
+   the explicit today snapshot added in `0.2.0b7`, then develop weekly/yearly
+   schedule inspection and bounded fault history. Refresh static metadata
+   separately from operational state. A server-side history bound
    must be established before introducing a history request; local truncation
    alone does not bound controller work.
 4. Implement runtime and energy only after confirming valid data and its

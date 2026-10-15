@@ -114,9 +114,10 @@ def test_actions_register_independently_and_setup_is_idempotent(context_service,
     c.services.async_setup_services(c.hass)
 
     assert set(c.hass.services.registered) == {
-        ("ae200", "read_member"), ("ae200", "read_control_context")
+        ("ae200", "read_member"), ("ae200", "read_control_context"),
+        ("ae200", "read_today_schedule"),
     }
-    assert c.hass.services.registrations == (2 if preexisting is None else 1)
+    assert c.hass.services.registrations == (3 if preexisting is None else 2)
     if preexisting is not None:
         assert c.hass.services.registered["ae200", preexisting] is sentinel
     for key, registered in c.hass.services.registered.items():
@@ -230,6 +231,7 @@ def test_context_action_fields_have_matching_translations():
     assert set(action["fields"]) == {"config_entry_id", "group_id"}
     assert all(field["name"] and field["description"] for field in action["fields"].values())
     yaml = (component / "services.yaml").read_text().split("read_control_context:\n", 1)[1]
+    yaml = yaml.split("read_today_schedule:\n", 1)[0]
     assert "config_entry:" in yaml and "integration: ae200" in yaml
     assert "min: 1" in yaml and "max: 50" in yaml
     assert yaml.count("required: true") == 2
