@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-This source targets the `0.2.1b5` cached diagnostic-quality fixes.
+This source targets the `0.2.1b6` raw daylight-settings diagnostic pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -146,6 +146,22 @@ control mechanisms are preserved, with no extra requests or polling. Command
 expectations remain historical evidence rather than current permissions or
 physical wall-remote confirmation. See
 [diagnostic state quality](docs/diagnostic-state-quality.md).
+Deployed HA regression confirmed all three flags against fresh raw data on
+the existing installation, preserving both reported true and false values,
+identifiers, operating settings, permissions and automations. No live outage
+was injected or default-disabled command sensor enabled; unavailable/error
+branches and command-field filtering retain offline test evidence.
+
+Version `0.2.1b6` adds an explicit read-only daylight-settings action for one
+selected controller. It retains eleven raw `SummerTime` configuration fields,
+sample times, safe errors and missing-field issues, with an independent
+15-second cooldown from completion. This helps inspect reported clock-adjacent
+configuration without changing the clock. It does not establish current DST,
+an enable flag, timezone, UTC offset or evaluated transitions. Clock and
+SummerTime are separate samples; no shift or automatic Clock query is added.
+One prior minimal live GET confirmed the field shape; HA action acceptance
+remains pending. There is no polling, new entity or write. See
+[controller daylight settings](docs/controller-daylight-settings.md).
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts

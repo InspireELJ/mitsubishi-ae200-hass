@@ -18,6 +18,7 @@ from . import (
     const,
     control_context,
     controller_clock,
+    controller_daylight_settings,
     local_restrictions,
     member_runtime,
     member_setpoint_history,
@@ -85,6 +86,10 @@ class MelansClient:
         self._last_clock_request: float | None = None
         self._controller_clock: dict[str, Any] = {}
         self._clock_read_status = "unknown"
+        self._daylight_lock = asyncio.Lock()
+        self._last_daylight_request: float | None = None
+        self._daylight_settings: dict[str, Any] = {}
+        self._daylight_read_status = "unknown"
         self._weekly_pattern_lock = asyncio.Lock()
         self._last_weekly_pattern_request: float | None = None
         self._weekly_patterns: dict[tuple[str, str, str], dict[str, Any]] = {}
@@ -768,6 +773,58 @@ class MelansClient:
             },
             "local_datetime": sample.local_datetime if sample and fresh else None,
             "timezone": None,
+            "issues": [
+                {"kind": issue.kind, "key": issue.key} for issue in sample.issues
+            ] if sample else [],
+        }
+
+    async def async_read_daylight_settings(self) -> dict[str, Any]:
+        """Read raw SummerTime settings without interpreting or changing them."""
+        async with self._daylight_lock:
+            if (
+                self._last_daylight_request is not None
+                and time.monotonic() - self._last_daylight_request < const.MIN_POLL_INTERVAL
+            ):
+                self._daylight_read_status = "cooldown"
+                return self.daylight_settings_snapshot()
+            record = self._daylight_settings
+            record["last_attempt"] = datetime.now(UTC)
+            try:
+                response = await self._request(
+                    controller_daylight_settings.build_controller_daylight_settings_request()
+                )
+                sample = controller_daylight_settings.parse_controller_daylight_settings(response)
+            except asyncio.CancelledError:
+                record["error"] = {"type": "CancelledError", "code": None}
+                self._daylight_read_status = "error"
+                raise
+            except MelansError as error:
+                record["error"] = self._optional_read_error(error)
+                self._daylight_read_status = "error"
+            else:
+                record.update(sample=sample, last_success=datetime.now(UTC),
+                              seen=time.monotonic(), error=None)
+                self._daylight_read_status = "updated"
+            finally:
+                self._last_daylight_request = time.monotonic()
+            return self.daylight_settings_snapshot()
+
+    def daylight_settings_snapshot(self) -> dict[str, Any]:
+        """Copy cached raw configuration, without enable, zone or offset claims."""
+        record = self._daylight_settings
+        sample = record.get("sample")
+        seen = record.get("seen")
+        fresh = (
+            seen is not None and not record.get("error")
+            and time.monotonic() - seen <= self.stale_after
+        )
+        return {
+            "read_status": self._daylight_read_status,
+            "quality": "fresh" if fresh else "stale" if seen is not None else "unknown",
+            "last_attempt": record["last_attempt"].isoformat() if record.get("last_attempt") else None,
+            "last_successful_read": record["last_success"].isoformat() if record.get("last_success") else None,
+            "error": dict(record["error"]) if record.get("error") else None,
+            "raw_attributes": sample.raw_attributes() if sample else {},
             "issues": [
                 {"kind": issue.kind, "key": issue.key} for issue in sample.issues
             ] if sample else [],

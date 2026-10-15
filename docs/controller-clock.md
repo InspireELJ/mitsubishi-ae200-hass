@@ -15,6 +15,8 @@ the controller's timezone, daylight-saving rules, clock accuracy or drift.
 Whether these fields already include daylight adjustment remains unverified.
 The reader does not add or subtract a shift or combine Clock with separate
 daylight settings to manufacture an adjusted time.
+The separate [raw daylight-settings action](controller-daylight-settings.md)
+can inspect reported configuration without evaluating rules or changing Clock.
 
 ## Explicit controller selection
 

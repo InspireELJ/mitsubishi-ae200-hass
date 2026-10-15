@@ -3,7 +3,9 @@
 Version `0.2.1b5` corrects cached HA diagnostic presentation without adding
 controller requests or control operations. Existing entity unique IDs,
 standard climate state and temperature readings, actions and automations are
-preserved. HA deployment acceptance for this version remains pending.
+preserved. Deployed HA normal-site regression has passed for fresh climate
+flags against the cached raw data. Unavailable/error branches and command
+field filtering have offline evidence rather than live fault injection.
 
 ## Climate flags follow entity availability
 
@@ -93,5 +95,11 @@ retry, confirmation or new control capability.
 Offline HA contracts cover fresh/unknown and unavailable states, allowlisted
 item values, retained identifiers and no-I/O behaviour. These checks do not
 create a live outage, change a controller flag, exercise a wall-remote button
-or widen hardware support. Deployment regression must be recorded separately
-after the installed integration version and actual cached state are checked.
+or widen hardware support. The actual HA integration and bundled library
+loaded `0.2.1b5`; all groups were fresh and their three climate flags matched
+cached raw values, including reported filter-on values. Existing identifiers,
+operating settings, local permissions and the enabled automation were retained.
+No live outage was injected, no control was sent for this regression and the
+default-disabled last-command sensor was not enabled. This normal-site check
+does not extend the unavailable/error or command-field tests into a claimed
+live fault/command acceptance.

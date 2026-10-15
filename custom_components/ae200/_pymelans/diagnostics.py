@@ -156,6 +156,7 @@ def cached_snapshot(client: MelansClient) -> dict[str, Any]:
         "member_temperature_histories": client.member_temperature_history_snapshot(),
         "member_setpoint_histories": client.member_setpoint_history_snapshot(),
         "controller_clock": client.controller_clock_snapshot(),
+        "daylight_settings": client.daylight_settings_snapshot(),
         "controller_metadata": {
             "attempted": client._metadata_attempted,
             "last_attempt": client.metadata_last_attempt.isoformat() if client.metadata_last_attempt else None,

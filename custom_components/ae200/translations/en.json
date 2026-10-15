@@ -144,6 +144,16 @@
         }
       }
     },
+    "read_daylight_settings": {
+      "name": "Read daylight settings",
+      "description": "Read the controller's raw daylight settings on demand, without changing rules or inferring enabled status, current daylight adjustment or time zone. Daylight reads have their own minimum 15 second interval.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Controller",
+          "description": "The AE-200 configuration entry to read from. Select it explicitly even when only one controller is configured."
+        }
+      }
+    },
     "read_controller_clock": {
       "name": "Read controller clock",
       "description": "Read the controller's local wall clock on demand. Returns a snapshot with its own data quality and no inferred time zone. Reads share a minimum 15 second interval.",

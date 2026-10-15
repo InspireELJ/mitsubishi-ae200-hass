@@ -3,6 +3,37 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1b6] - 2026-10-16
+
+### Added
+- Response-only `ae200.read_daylight_settings` action requiring one explicitly
+  selected integration entry. One minimal `SummerTime` GET retains only eleven
+  allowlisted raw configuration fields, independent read metadata and issues.
+- A singleton cache and its own controller-wide 15-second cooldown from
+  completion, alongside normal shared I/O pacing. Missing fields remain absent
+  with issues; present empty, wildcard, negative and future tokens remain raw.
+  A partial successful sample can be fresh without proving rule validity.
+- Cache-only `daylight_settings` diagnostics, with retained historical raw
+  evidence after expiry, failure or cancellation. Cancellation propagates,
+  records a safe error after an attempt starts and preserves the prior sample.
+
+### Validation scope
+- The official controller web client and one prior minimal live GET establish
+  the eleven-field request/response shape. HA action deployment acceptance
+  remains pending. No private configuration values are published.
+- This diagnostic helps inspect reported clock-adjacent configuration without
+  adjusting the clock. It adds no enabled/current-DST state, timezone, UTC
+  offset, numeric transition evaluation or derived datetime, even as null fields.
+  Clock and SummerTime reads are separate samples, not an atomic snapshot.
+- No setup read, periodic poll, new entity, clock/rule write, automatic Clock
+  query or time shift is introduced. Existing identifiers, controls, automations,
+  Clock behaviour and daily-history cooldown are preserved.
+- The preceding `0.2.1b5` version passed normal-site HA regression: fresh
+  climate flags matched cached raw values, including reported filter-on values,
+  while identifiers, operating settings, permissions and automations were
+  retained. No live outage was injected or default-disabled command sensor
+  enabled; unavailable/error branches and command filtering remain offline-tested.
+
 ## [0.2.1b5] - 2026-10-16
 
 ### Fixed
