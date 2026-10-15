@@ -115,6 +115,27 @@ set_local_restrictions:
     filter_reset_prohibited:
       selector:
         boolean:
+read_member_temperature_history:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: ae200
+    address:
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 250
+          step: 1
+          mode: box
+    date_iso:
+      required: true
+      example: "2026-01-01"
+      selector:
+        date:
 read_member_runtime:
   fields:
     config_entry_id:

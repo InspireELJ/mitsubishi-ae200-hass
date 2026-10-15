@@ -30,6 +30,24 @@
     }
   },
   "services": {
+    "read_member_temperature_history": {
+      "name": "Read member temperature history",
+      "description": "Read one configured indoor unit's raw ROOM_TEMP history for one explicit date. Returns original tokens and positional interval labels without numeric temperatures, verified units or aggregation. History reads share a minimum 15 second interval.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Controller",
+          "description": "The AE-200 configuration entry to read from. Select it explicitly even when only one controller is configured."
+        },
+        "address": {
+          "name": "Member address",
+          "description": "One configured indoor unit bus address from 1 to 250, verified by cached topology. This is not a group number."
+        },
+        "date_iso": {
+          "name": "Date",
+          "description": "One controller-local calendar date in YYYY-MM-DD form. The pilot accepts years 1970 to 2037; availability of history is not guaranteed."
+        }
+      }
+    },
     "read_member_runtime": {
       "name": "Read member runtime",
       "description": "Read one configured indoor unit's reported runtime history for one explicit date and channel. Returns a snapshot without summing intervals or inferring current operation. Reads share a minimum 15 second interval.",
