@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-This source targets the `0.2.0b8` on-demand controller-clock pilot.
+This source targets the `0.2.0b9` on-demand weekly-pattern pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -47,8 +47,27 @@ can produce an offset-free local datetime; timezone, daylight-saving and clock
 drift remain unknown. Clock and schedule reads are separate samples. There is
 no automatic query, periodic clock poll, new entity or time synchronisation.
 One minimal live Clock GET confirmed the six-field response and passed parsing
-without issues; HA action deployment acceptance remains pending. See
+without issues. The deployed HA action also returned a fresh successful
+snapshot matching cached diagnostics exactly, with existing entity identifiers
+and automations preserved. See
 [controller-clock diagnostics](docs/controller-clock.md).
+
+Version `0.2.0b9` adds an explicit read-only action for one configured group's
+weekly pattern, selected by season 1–5 and pattern 1–7. Each invocation sends
+one scoped `WPatternList` GET and keeps independent cached records, errors and
+sample times, with a controller-wide cooldown measured from completion.
+The parser retains 18 raw fields and rejects responses exceeding its
+24-record receive boundary rather than truncating them. That boundary is
+not a claim about server capacity. There is no automatic 35-combination scan,
+pattern activation, schedule write or clock-date association. One minimal live
+GET returned an empty pattern and passed parsing without issues; HA action
+deployment and non-empty plans remain subject to acceptance. See
+[weekly-pattern diagnostics](docs/weekly-pattern.md).
+
+The existing default-disabled schedule diagnostic keeps its identifier and
+`Schedule`-based state. Its corrected name is *Controller schedule flag*, with
+a separate cached `schedule_available` attribute from `ScheduleAvail` while the
+entity is available. Neither flag proves that a pattern is active or executing.
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts

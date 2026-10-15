@@ -5,8 +5,9 @@ the native HACS integration. An explicit request reads the controller's local
 wall-clock fields and retains an independently timed diagnostic snapshot.
 Existing entities, identifiers, central controls and HA automations are
 preserved. One minimal live Clock GET confirmed the six-field response and
-passed strict parsing without issues. HA action deployment acceptance remains
-pending.
+passed strict parsing without issues. HA deployment acceptance also confirmed
+a fresh successful action response matching cached diagnostics exactly, with
+existing entity identifiers and automations preserved.
 
 There is no clock read at setup or reload, periodic clock poll, new clock
 entity, clock write or time synchronisation. The snapshot does not establish
@@ -102,7 +103,9 @@ Static evidence establishes the six-field builder and conservative editor
 ranges. One minimal live websocket GET returned a single Clock record with
 all six raw fields. The parser produced matching typed components and a valid
 offset-free local datetime without issues. This verifies that bounded protocol
-read on the pilot controller; HA action deployment acceptance remains pending.
+read on the pilot controller. The deployed HA action has also passed
+acceptance: its fresh successful response matched the downloaded cache
+exactly, including raw fields, components, sample times and unknown timezone.
 
 That response does not establish clock accuracy, timezone, daylight-saving
 rules, synchronisation, drift or behaviour on other firmware. Private responses,

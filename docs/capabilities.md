@@ -24,7 +24,7 @@ promise of support:
 
 Implementation status has a separate meaning:
 
-- **Implemented**: present in the `0.2.0b8` source. Individual device support
+- **Implemented**: present in the `0.2.0b9` source. Individual device support
   and end-to-end acceptance still apply. This is not a claim that every row has
   passed a live control test or that an installation has loaded this version.
 - **Shared library only**: protocol support exists without a complete native HA
@@ -32,7 +32,53 @@ Implementation status has a separate meaning:
 - **Planned**: a candidate requiring implementation, additional protocol
   evidence or a suitable device. It is not currently a supported HA feature.
 
-## Scope of 0.2.0b8
+## Scope of 0.2.0b9
+
+The response-only `ae200.read_weekly_pattern` action explicitly selects one
+integration entry, configured group, season 1–5 and pattern 1–7. One minimal
+`ScheduleControl/WPatternList` GET requests only that combination. There is no
+automatic traversal of all 35 season/pattern slots, startup query, periodic
+schedule poll, new entity, pattern activation, schedule write or automation
+change. See [weekly-pattern diagnostics](weekly-pattern.md).
+
+An 18-field allowlist preserves raw record values. The official editor's
+24-row limit supplies a conservative receive protection: oversized responses
+fail rather than being truncated. This is not proof of server capacity or a
+server-side pagination bound. Invalid selectors, mismatched directories and
+controller errors must not become successful single-pattern snapshots.
+
+Each selected combination has independent sample times, errors and freshness.
+An optional failed read retains historical raw records with their age and
+quality; it does not alter climate availability or renew another pattern's
+sample. The controller-wide 15-second cooldown is measured from completion
+across all weekly-pattern selectors. Downloading diagnostics adds no I/O.
+
+An empty action is no control of that field; wildcard and unfamiliar tokens
+remain unknown. Plans, indices and row order do not prove execution order or
+physical operation. A selected season/pattern slot does not establish its
+activation, weekday, date, exception handling or precedence. Separate Clock,
+TodayList and weekly-pattern reads are not atomic and do not establish a
+verified calendar date or next execution.
+
+Static evidence establishes the builder and record model. One minimal live
+websocket GET for one group/season/pattern combination returned zero records
+and passed strict parsing without issues. HA action deployment acceptance
+remains pending. Non-empty actions, activation and execution need their own
+evidence. An accepted empty response does not establish that other slots are
+empty or scheduling is disabled.
+
+The existing default-disabled schedule diagnostic keeps its `schedule_on`
+identifier, original `Schedule` state source and creation rule. Its name is
+corrected to *Controller schedule flag*. Exact `Schedule=ON/OFF` remains its
+state; it is not renamed internally or switched to a different data source.
+The separate `schedule_available` attribute interprets exact
+`ScheduleAvail=ON/OFF` only while the entity is available. Missing, unfamiliar,
+stale or failed data, or a failed coordinator update, makes this attribute
+unknown. `raw_schedule_flag` and `raw_schedule_available` expose only limited
+safe raw tokens. These are cached attributes, not new entities or requests;
+neither flag establishes pattern activation, today's records or execution.
+
+## Clock scope introduced in 0.2.0b8
 
 The response-only `ae200.read_controller_clock` action reads six local-clock
 fields for one explicitly selected integration entry. It retains independent
@@ -46,7 +92,9 @@ produces `local_datetime`, without an offset. Expired or failed samples retain
 historical raw values while the typed datetime becomes unknown. No UTC offset,
 daylight-saving rule or clock drift is inferred. One minimal live Clock GET
 returned all six fields and passed strict parsing without issues; HA action
-deployment acceptance remains pending.
+deployment acceptance also confirmed a fresh successful action response
+matching cached diagnostics exactly. Existing entity identifiers and
+automations were preserved.
 A clock read and a separate `TodayList` read are not atomic and do not establish
 that a schedule snapshot belongs to a verified date.
 
@@ -137,7 +185,7 @@ controller acknowledgement is still distinct from a confirmed state readback.
 
 The release also adds two kinds of diagnostic entity, disabled by default:
 the controller's last command status and each group's controller-schedule
-enabled flag where a recognised flag exists. Both use cached data and add no
+flag where a recognised flag exists. Both use cached data and add no
 controller requests. The schedule flag is read-only; this release neither
 reads full schedule contents nor writes or replaces controller schedules or
 HA automations.
@@ -192,10 +240,11 @@ behaviour and diagnostic entities described here apply to HACS.
 | Detailed equipment identity and capacities | Planned | Address-level models include model, capacity, location and system codes. | Confirm which codes are populated and obtain an authoritative decoding before presenting a model or capacity as fact. |
 | Actual Thermo-ON, fan and defrost state | Raw on-demand member diagnostics in 0.2.0b4; operational entities planned | Complete live ThermoStatus/FanStatus strings and a fan-only test. DefrostStatus rejected by pilot firmware. | Validate XML value semantics and group aggregation. Power on and a cooling mode do not prove active cooling or compressor operation. |
 | Active fault codes and fault history | Planned | Official address-level alarm fields and `AlarmList` request/parser models. | Confirm active versus recovered records, timestamps, bounded history size and code interpretation. Keep reset/clear operations separate from monitoring. |
-| Controller schedule enabled flag | Implemented read-only diagnostic in 0.2.0b3, disabled by default | Existing cached `Schedule` values and offline entity contracts. | A valid ON/OFF flag describes enabled status, not whether an action is currently running. No schedule write is implemented. |
+| Controller schedule flag and availability | Existing read-only diagnostic from 0.2.0b3; label corrected and separate availability attribute added in 0.2.0b9, disabled by default | Cached `Schedule` and `ScheduleAvail` values, with independent raw and nullable availability attributes. | Preserve the existing identifier and state source. Unknown or unavailable data stays unknown; neither flag proves activation, execution, today's records or next-run timing. No schedule write is implemented. |
 | Single-group today schedule | Explicit read-only diagnostic action in 0.2.0b7 | Official `TodayList` model; empty live response; non-empty offline fixtures only. | Accept non-empty plans on suitable equipment before interpreting execution. Preserve unknowns and sample times; no next-run calculation or schedule write. |
-| Controller local clock | Explicit read-only diagnostic action in 0.2.0b8 | Official six-field model and one minimal live GET parsed without issues; HA action deployment acceptance pending. | Preserve local fields and unknowns. Validate Gregorian date/time before producing an offset-free local datetime; no timezone, DST, drift or atomic schedule-date inference. |
-| Weekly/yearly schedules and schedule editing | Planned | Official weekly season/pattern and yearly models. | Establish explicit bounded request scopes and time semantics, document precedence with HA automations, then design editing, backup and recovery separately. A today snapshot is not the complete controller schedule. |
+| Controller local clock | Explicit read-only diagnostic action in 0.2.0b8 | Official six-field model, one minimal live GET and deployed HA action/cache acceptance. | Preserve local fields and unknowns. Validate Gregorian date/time before producing an offset-free local datetime; no timezone, DST, drift or atomic schedule-date inference. |
+| Single-group weekly pattern | Explicit read-only diagnostic action in 0.2.0b9 | Official `WPatternList` builder and one single-selector empty live response parsed without issues; HA action acceptance pending. | Accept the HA action, preserve unknowns and independent freshness, and verify non-empty actions separately. No automatic 35-slot scan, activation, execution, clock-date binding or server-capacity claim. |
+| Yearly patterns, season activation and schedule editing | Planned | Official season, annual-pattern and yearly-directory models. | Establish separately bounded request scopes and activation/precedence semantics. A today or single weekly-pattern sample is not the complete controller schedule. Design editing, backup and recovery separately after read-only acceptance. |
 | Runtime and Thermo-ON time | Planned | Official runtime/account and trend models. | Confirm units, counter resets, bucket boundaries and aggregation before creating HA statistics. |
 | Electrical power, energy, COP and apportionment | Planned | Official energy models and documented licensed functions. | Establish installed metering and licences, data provenance, units and reset semantics. Keep measured, estimated and apportioned energy distinct. |
 | Lossnay and ventilation | Shared library only for partial parsing; complete HA control planned | Official ventilation capability flags and enum algorithms. | Obtain meaningful data from a ventilation installation. AC placeholder fields cannot establish Lossnay support. |
@@ -294,9 +343,9 @@ hardware functions solely because local controls are prohibited.
    fault detail and actual operating-state entities with explicit unknown
    handling. Define aggregation where several indoor units share one group.
 3. Accept the controller identity and licence summaries added in `0.2.0b5` and
-   the explicit today snapshot added in `0.2.0b7` and local-clock snapshot in
-   `0.2.0b8`, then develop weekly/yearly schedule inspection and bounded fault
-   history. Clock and schedule reads are separate samples. Refresh static metadata
+   the explicit today snapshot added in `0.2.0b7`, local-clock snapshot in
+   `0.2.0b8` and single weekly pattern in `0.2.0b9`, then develop yearly-pattern
+   and activation inspection and bounded fault history. Clock and schedule reads are separate samples. Refresh static metadata
    separately from operational state. A server-side history bound
    must be established before introducing a history request; local truncation
    alone does not bound controller work.

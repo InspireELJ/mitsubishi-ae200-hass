@@ -53,3 +53,37 @@ read_controller_clock:
       selector:
         config_entry:
           integration: ae200
+read_weekly_pattern:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: ae200
+    group_id:
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 50
+          step: 1
+          mode: box
+    season:
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 5
+          step: 1
+          mode: box
+    pattern:
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 7
+          step: 1
+          mode: box

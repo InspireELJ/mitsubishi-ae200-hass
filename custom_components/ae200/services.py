@@ -15,9 +15,12 @@ SERVICE_READ_MEMBER = "read_member"
 SERVICE_READ_CONTROL_CONTEXT = "read_control_context"
 SERVICE_READ_TODAY_SCHEDULE = "read_today_schedule"
 SERVICE_READ_CONTROLLER_CLOCK = "read_controller_clock"
+SERVICE_READ_WEEKLY_PATTERN = "read_weekly_pattern"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 ATTR_ADDRESS = "address"
 ATTR_GROUP_ID = "group_id"
+ATTR_SEASON = "season"
+ATTR_PATTERN = "pattern"
 
 
 def _member_address(value: Any) -> int:
@@ -61,6 +64,36 @@ READ_CONTROL_CONTEXT_SCHEMA = vol.Schema(
 READ_TODAY_SCHEDULE_SCHEMA = READ_CONTROL_CONTEXT_SCHEMA
 READ_CONTROLLER_CLOCK_SCHEMA = vol.Schema(
     {vol.Required(ATTR_CONFIG_ENTRY_ID): vol.All(str, vol.Length(min=1))}
+)
+
+
+def _weekly_index(value: Any, field: str, maximum: int) -> int:
+    """Validate one concrete weekly selector without truncation or guessing."""
+    if isinstance(value, bool) or not (
+        isinstance(value, int) or isinstance(value, str) and value.isdecimal()
+    ):
+        raise vol.Invalid(f"{field} must be an integer from 1 to {maximum}")
+    number = int(value)
+    if not 1 <= number <= maximum:
+        raise vol.Invalid(f"{field} must be an integer from 1 to {maximum}")
+    return number
+
+
+def _season(value: Any) -> int:
+    return _weekly_index(value, ATTR_SEASON, 5)
+
+
+def _pattern(value: Any) -> int:
+    return _weekly_index(value, ATTR_PATTERN, 7)
+
+
+READ_WEEKLY_PATTERN_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_CONFIG_ENTRY_ID): vol.All(str, vol.Length(min=1)),
+        vol.Required(ATTR_GROUP_ID): _group_id,
+        vol.Required(ATTR_SEASON): _season,
+        vol.Required(ATTR_PATTERN): _pattern,
+    }
 )
 
 
@@ -157,6 +190,27 @@ def async_setup_services(hass: HomeAssistant) -> None:
         # independent quality is preserved without inferring a time zone.
         return clock
 
+    async def async_read_weekly_pattern(call: ServiceCall) -> ServiceResponse:
+        coordinator = _entry_coordinator(hass, call.data[ATTR_CONFIG_ENTRY_ID])
+        try:
+            pattern = await coordinator.client.async_read_weekly_pattern(
+                call.data[ATTR_GROUP_ID], call.data[ATTR_SEASON], call.data[ATTR_PATTERN]
+            )
+        except ValueError as err:
+            raise ServiceValidationError(str(err)) from err
+        except MelansError as err:
+            raise HomeAssistantError("The AE-200 weekly pattern read failed") from err
+        if isinstance(pattern, dict) and pattern.get("read_status") == "cooldown":
+            raise HomeAssistantError(
+                "The AE-200 weekly pattern read is cooling down. "
+                "Wait at least 15 seconds before another weekly pattern read"
+            )
+        if not isinstance(pattern, dict) or pattern.get("read_status") not in ("updated", "error"):
+            raise HomeAssistantError("The AE-200 read did not produce a weekly pattern")
+        # A pattern is an independently timed plan, not an enabled schedule,
+        # a weekday assignment or a prediction of the next execution.
+        return pattern
+
     if not hass.services.has_service(DOMAIN, SERVICE_READ_MEMBER):
         hass.services.async_register(
             DOMAIN,
@@ -187,5 +241,13 @@ def async_setup_services(hass: HomeAssistant) -> None:
             SERVICE_READ_CONTROLLER_CLOCK,
             async_read_controller_clock,
             schema=READ_CONTROLLER_CLOCK_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_READ_WEEKLY_PATTERN):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_READ_WEEKLY_PATTERN,
+            async_read_weekly_pattern,
+            schema=READ_WEEKLY_PATTERN_SCHEMA,
             supports_response=SupportsResponse.ONLY,
         )
