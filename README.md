@@ -2,7 +2,7 @@
 
 ## InspireELJ internal pilot
 
-This source targets the `0.2.1b3` raw member room-temperature-history pilot.
+This source targets the `0.2.1b4` raw member setpoint-history pilot.
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -113,9 +113,23 @@ for one topology-validated IC member and one date. It reads only `ROOM_TEMP`,
 preserving raw strings and, for exactly 48 tokens, naive half-hour position
 labels. Unit, aggregation and timezone remain unknown; there is no numeric
 temperature projection, statistic, entity or automatic query. Room and runtime
-history share a 15-second cooldown from completion. One minimal live response
-contained a non-zero 48-token sequence and passed parsing; HA action acceptance
-is pending. See [member temperature history](docs/member-temperature-history.md).
+history share a 15-second cooldown from completion. The deployed HA action
+returned a fresh successful 48-token snapshot matching both cached diagnostics
+and the selected protocol sample exactly. An immediate repeat produced the
+expected cooldown error without altering sample times. Existing identifiers,
+operating settings, permissions and automations were preserved. See
+[member temperature history](docs/member-temperature-history.md).
+
+Version `0.2.1b4` adds an explicit read-only action for one configured IC
+member, one date and either `COOL_SET_TEMP` or `HEAT_SET_TEMP`. It retains
+raw tokens and nominal half-hour position labels with unknown unit,
+aggregation and timezone. The runtime, room and setpoint history actions
+share one 15-second cooldown from completion. Separate minimal live reads
+returned 48 numeric-looking cooling strings and 48 empty heating strings;
+empty strings do not mean zero, no heating or unsupported history. HA action
+acceptance is pending. No setpoint is changed, no numeric temperature entity
+is added and the ROOM_TEMP action keeps its fixed schema. See
+[member setpoint history](docs/member-setpoint-history.md).
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts

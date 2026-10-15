@@ -121,8 +121,9 @@ def test_actions_register_independently_and_setup_is_idempotent(context_service,
         ("ae200", "set_local_restrictions"),
         ("ae200", "read_member_runtime"),
         ("ae200", "read_member_temperature_history"),
+        ("ae200", "read_member_setpoint_history"),
     }
-    assert c.hass.services.registrations == (8 if preexisting is None else 7)
+    assert c.hass.services.registrations == (9 if preexisting is None else 8)
     if preexisting is not None:
         assert c.hass.services.registered["ae200", preexisting] is sentinel
     for key, registered in c.hass.services.registered.items():

@@ -24,7 +24,7 @@ promise of support:
 
 Implementation status has a separate meaning:
 
-- **Implemented**: present in the `0.2.1b3` source. Individual device support
+- **Implemented**: present in the `0.2.1b4` source. Individual device support
   and end-to-end acceptance still apply. This is not a claim that every row has
   passed a live control test or that an installation has loaded this version.
 - **Shared library only**: protocol support exists without a complete native HA
@@ -32,7 +32,32 @@ Implementation status has a separate meaning:
 - **Planned**: a candidate requiring implementation, additional protocol
   evidence or a suitable device. It is not currently a supported HA feature.
 
-## Scope of 0.2.1b3
+## Scope of 0.2.1b4
+
+The response-only `ae200.read_member_setpoint_history` action requires one
+explicit entry, topology-validated IC address, strict Gregorian `date_iso`
+and one exact `data_name`: `COOL_SET_TEMP` or `HEAT_SET_TEMP`. One minimal GET
+reads only that selector. No channel defaults, aliases, ROOM_TEMP override,
+group fields or extra parameters are accepted. See
+[raw member setpoint history](member-setpoint-history.md).
+
+Independent setpoint-history snapshots retain only the selected raw field,
+original tokens, sample times, safe errors and quality. Exactly 48 tokens
+receive naive half-hour position labels; no numeric temperature is exported.
+Unit, aggregation and timezone stay unknown. Runtime, room and setpoint
+history share a controller-wide lock and a 15-second completion cooldown.
+There are at most 32 local LRU setpoint-history samples, with no startup read,
+polling, automatic day/channel scan, numeric statistic, entity or write.
+
+Separate minimal live cooling and heating GETs each returned one record and
+48 raw tokens. Cooling contained numeric-looking strings; heating contained
+48 empty strings separated by 47 commas. This confirms those selected request
+shapes, not units, collection validity or measurement semantics. Empty strings
+are not zero, evidence of no heating or an unsupported endpoint. HA action
+deployment acceptance remains pending. The fixed ROOM_TEMP action schema and
+existing identifiers, controls and automations are preserved.
+
+## Room-temperature-history scope introduced in 0.2.1b3
 
 The response-only `ae200.read_member_temperature_history` action requires one
 explicit entry, topology-validated IC address and strict Gregorian `date_iso`.
@@ -43,7 +68,7 @@ See [raw member temperature history](member-temperature-history.md).
 Independent samples preserve `RoomTempData`, original tokens, times, safe
 errors and quality. An exact 48-token response receives naive half-hour graph
 position labels; no numeric temperature is exported. `unit`, `aggregation`
-and `timezone` remain unknown. The shared room/runtime history cooldown is
+and `timezone` remain unknown. The shared room/runtime/setpoint history cooldown is
 controller-wide, 15 seconds from completion, with no automatic query, polling,
 second-channel fallback, entity or statistic. At most 32 room-history selectors
 are retained by a local LRU policy, rather than a server-capacity claim.
@@ -52,7 +77,11 @@ One minimal live `ROOM_TEMP` read returned one record with 48 non-zero
 numeric-looking tokens and passed strict parsing without issues. The vendor
 graph expects Celsius, but that display convention does not establish units,
 aggregation, collection validity or measurement support across firmware.
-HA action deployment acceptance remains pending. A failed or cancelled
+Deployed HA acceptance has passed for the selected room-history sample:
+48 raw tokens and positions matched both the cached snapshot and protocol
+sample exactly. An immediate repeat returned a cooldown error without changing
+the original attempt or success time. Identifiers, operating settings,
+permissions and automations were retained. A failed or cancelled
 history attempt retains prior raw evidence and sample times with stale
 quality; cancellation propagates without retry or renewing sample freshness.
 
@@ -377,7 +406,8 @@ behaviour and diagnostic entities described here apply to HACS.
 | Single-group weekly pattern | Explicit read-only diagnostic action in 0.2.0b9 | Official `WPatternList` builder, one single-selector empty live response and deployed HA action/cache acceptance. | Preserve unknowns and independent freshness, and verify non-empty actions separately. No automatic 35-slot scan, activation, execution, clock-date binding or server-capacity claim. |
 | Yearly patterns, season activation and schedule editing | Planned | Official season, annual-pattern and yearly-directory models. | Establish separately bounded request scopes and activation/precedence semantics. A today or single weekly-pattern sample is not the complete controller schedule. Design editing, backup and recovery separately after read-only acceptance. |
 | Member daily runtime and Thermo-ON history | On-demand raw and nullable-bucket diagnostic in 0.2.1b1; selected HA samples accepted; statistics and entities planned separately | Official IC daily graph grammar; one member/day accepted on FAN_TIME and THERMO_TIME, each with 48 zero tokens and exact fresh HA/cache agreement. | Validate non-zero data, collection quality, missing/partial/DST samples, other hardware and provenance before totals or HA statistics. Numeric zero and licence active do not establish measured idle time. |
-| IC member room-temperature history | On-demand raw-only diagnostic in 0.2.1b3; HA action acceptance pending | Fixed ROOM_TEMP request, official graph grammar and one selected non-zero 48-token response parsed without issues. | Keep unit, aggregation and timezone unknown. Validate provenance and firmware-specific semantics before numeric temperatures, averages, statistics or historical/current-state claims. |
+| IC member room-temperature history | On-demand raw-only diagnostic in 0.2.1b3; selected HA sample accepted | Fixed ROOM_TEMP request, official graph grammar and exact selected 48-token action/cache/protocol agreement; immediate cooldown accepted. | Keep unit, aggregation and timezone unknown. Validate provenance and firmware-specific semantics before numeric temperatures, averages, statistics or historical/current-state claims. |
+| IC member cooling/heating setpoint history | On-demand raw-only diagnostic in 0.2.1b4; HA action acceptance pending | One selected COOL_SET_TEMP response with 48 numeric-looking strings and one HEAT_SET_TEMP response with 48 empty strings. | Empty slots do not mean zero, no heating or no support. Validate units, aggregation and collection provenance before numeric history or statistics. History does not change or prove the current setpoint. |
 | Electrical power, energy, COP and apportionment | Planned | Official energy models and documented licensed functions. | Establish installed metering and licences, data provenance, units and reset semantics. Keep measured, estimated and apportioned energy distinct. |
 | Lossnay and ventilation | Shared library only for partial parsing; complete HA control planned | Official ventilation capability flags and enum algorithms. | Obtain meaningful data from a ventilation installation. AC placeholder fields cannot establish Lossnay support. |
 | ATW, hot-water heat pumps and chillers | Partial legacy classification/sensors exist; verified device-specific HA support planned | Official separate operating modes, temperature ranges and system models. | Validate a suitable device before claiming device-family control. The existing generic climate entity is not proof of a verified hydronic mode mapping. |

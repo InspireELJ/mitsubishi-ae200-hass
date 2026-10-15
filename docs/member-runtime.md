@@ -164,8 +164,9 @@ separate evidence and a deliberate bounded-parser change.
 The client read reuses normal request locking and pacing and a
 controller-wide 15-second cooldown measured from completion across selectors.
 From `0.2.1b3`, the raw room-temperature-history reader shares this same lock
-and cooldown. Alternating members, dates or the two daily-history actions does
-not bypass that boundary. A cancelled attempt propagates cancellation, retains
+and cooldown; `0.2.1b4` adds the raw setpoint-history reader to the same boundary.
+Alternating members, dates, channels or the three daily-history actions does
+not bypass it. A cancelled attempt propagates cancellation, retains
 the previous raw sample and success time, and marks the latest attempt as an
 error. An earlier sample becomes stale rather than appearing to be a new
 successful read. Cancellation while waiting for the action lock makes no new

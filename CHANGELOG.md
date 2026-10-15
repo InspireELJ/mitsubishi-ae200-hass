@@ -3,6 +3,35 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1b4] - 2026-10-16
+
+### Added
+- Response-only `ae200.read_member_setpoint_history` action for one explicit
+  entry, topology-validated IC address, Gregorian date and exact
+  `COOL_SET_TEMP` or `HEAT_SET_TEMP` selection. One minimal GET reads only
+  that member/date/channel; no default or automatic second channel is added.
+- Independent raw history, times, errors and quality, with at most 32 local
+  LRU selector samples. Exactly 48 tokens receive naive half-hour position
+  labels; unit, aggregation and timezone stay unknown, with no numeric
+  temperature projection, entity, statistic or setpoint change.
+- Cached diagnostics export setpoint history without I/O. Runtime, room and
+  setpoint history actions share the same controller-wide 15-second cooldown
+  measured from completion, including failed or cancelled attempts.
+
+### Validation scope
+- Separate minimal live cooling and heating history GETs each returned one
+  record with 48 raw tokens. The cooling series had numeric-looking strings;
+  the heating series had 48 empty strings separated by 47 commas. Empty slots
+  are retained rather than interpreted as zero, no heating or no support.
+- HA action deployment acceptance remains pending. Display conventions do
+  not establish wire units, aggregation, collection validity or measurement
+  semantics. No polling, scan, numeric conversion or current-state inference
+  is introduced, and the existing ROOM_TEMP action schema is preserved.
+- The preceding `0.2.1b3` deployed HA room-history action has now passed exact
+  action/cache/protocol-sample checks and an immediate-repeat cooldown check.
+  Original identifiers, operating settings, permissions and automations were
+  retained. Numeric units and measurement validity remain unverified.
+
 ## [0.2.1b3] - 2026-10-16
 
 ### Added
