@@ -21,6 +21,7 @@ SERVICE_READ_MEMBER = "read_member"
 SERVICE_READ_CONTROL_CONTEXT = "read_control_context"
 SERVICE_READ_TODAY_SCHEDULE = "read_today_schedule"
 SERVICE_READ_CONTROLLER_CLOCK = "read_controller_clock"
+SERVICE_READ_DAYLIGHT_SETTINGS = "read_daylight_settings"
 SERVICE_READ_WEEKLY_PATTERN = "read_weekly_pattern"
 SERVICE_SET_LOCAL_RESTRICTIONS = "set_local_restrictions"
 SERVICE_READ_MEMBER_RUNTIME = "read_member_runtime"
@@ -83,6 +84,7 @@ READ_TODAY_SCHEDULE_SCHEMA = READ_CONTROL_CONTEXT_SCHEMA
 READ_CONTROLLER_CLOCK_SCHEMA = vol.Schema(
     {vol.Required(ATTR_CONFIG_ENTRY_ID): vol.All(str, vol.Length(min=1))}
 )
+READ_DAYLIGHT_SETTINGS_SCHEMA = READ_CONTROLLER_CLOCK_SCHEMA
 
 
 def _weekly_index(value: Any, field: str, maximum: int) -> int:
@@ -295,6 +297,25 @@ def async_setup_services(hass: HomeAssistant) -> None:
         # independent quality is preserved without inferring a time zone.
         return clock
 
+    async def async_read_daylight_settings(call: ServiceCall) -> ServiceResponse:
+        coordinator = _entry_coordinator(hass, call.data[ATTR_CONFIG_ENTRY_ID])
+        try:
+            settings = await coordinator.client.async_read_daylight_settings()
+        except ValueError as err:
+            raise ServiceValidationError(str(err)) from err
+        except MelansError as err:
+            raise HomeAssistantError("The AE-200 daylight settings read failed") from err
+        if isinstance(settings, dict) and settings.get("read_status") == "cooldown":
+            raise HomeAssistantError(
+                "The AE-200 daylight settings read is cooling down. "
+                "Wait at least 15 seconds before another daylight settings read"
+            )
+        if not isinstance(settings, dict) or settings.get("read_status") not in ("updated", "error"):
+            raise HomeAssistantError("The AE-200 read did not produce a daylight settings sample")
+        # Raw configuration does not establish whether an adjustment is
+        # enabled, currently applied, or related to the reported Clock.
+        return settings
+
     async def async_read_weekly_pattern(call: ServiceCall) -> ServiceResponse:
         coordinator = _entry_coordinator(hass, call.data[ATTR_CONFIG_ENTRY_ID])
         try:
@@ -474,5 +495,13 @@ def async_setup_services(hass: HomeAssistant) -> None:
             SERVICE_READ_MEMBER_SETPOINT_HISTORY,
             async_read_member_setpoint_history,
             schema=READ_MEMBER_SETPOINT_HISTORY_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_READ_DAYLIGHT_SETTINGS):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_READ_DAYLIGHT_SETTINGS,
+            async_read_daylight_settings,
+            schema=READ_DAYLIGHT_SETTINGS_SCHEMA,
             supports_response=SupportsResponse.ONLY,
         )

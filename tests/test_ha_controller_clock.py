@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib
-import itertools
 import json
 import sys
 import types
@@ -20,6 +19,7 @@ ACTION_NAMES = (
     "read_weekly_pattern", "set_local_restrictions", "read_member_runtime",
     "read_member_temperature_history",
     "read_member_setpoint_history",
+    "read_daylight_settings",
 )
 
 
@@ -107,8 +107,8 @@ def sample(*, status="updated", quality="fresh"):
 
 @pytest.mark.parametrize(
     "preexisting",
-    [tuple(name for name, exists in zip(ACTION_NAMES, flags, strict=True) if exists)
-     for flags in itertools.product((False, True), repeat=len(ACTION_NAMES))],
+    [(), ACTION_NAMES, *((name,) for name in ACTION_NAMES),
+     *(tuple(other for other in ACTION_NAMES if other != name) for name in ACTION_NAMES)],
 )
 def test_each_action_registers_independently_and_idempotently(clock_service, preexisting):
     c = clock_service

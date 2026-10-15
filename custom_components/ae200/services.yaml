@@ -192,3 +192,10 @@ read_member_runtime:
           options:
             - FAN_TIME
             - THERMO_TIME
+read_daylight_settings:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: ae200

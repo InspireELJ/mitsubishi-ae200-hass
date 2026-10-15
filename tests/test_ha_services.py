@@ -146,7 +146,7 @@ async def test_action_is_registered_without_entries_and_requires_a_response(ha_s
     c = ha_service_modules
     assert await c.integration.async_setup(c.hass, {})
     assert await c.integration.async_setup(c.hass, {})
-    assert c.hass.services.registrations == 9
+    assert c.hass.services.registrations == 10
     registered = c.hass.services.registered["ae200", "read_member"]
     assert registered["supports_response"] == c.SupportsResponse.ONLY
 
@@ -411,6 +411,7 @@ async def test_unload_keeps_global_action_registered(ha_service_modules):
 
     coordinator.async_shutdown.assert_awaited_once()
     assert c.hass.services.has_service("ae200", "read_member")
+    assert c.hass.services.has_service("ae200", "read_daylight_settings")
     with pytest.raises(c.HomeAssistantError, match="not loaded"):
         await c.hass.services.call({"config_entry_id": "selected", "address": 7})
 
@@ -424,4 +425,4 @@ def test_action_fields_have_matching_translations():
     assert all(field["name"] and field["description"] for field in action["fields"].values())
     yaml = (ROOT / "custom_components/ae200/services.yaml").read_text()
     assert "config_entry:" in yaml and "integration: ae200" in yaml
-    assert yaml.count("required: true") == 24
+    assert yaml.count("required: true") == 25

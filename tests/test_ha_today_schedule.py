@@ -19,6 +19,7 @@ ACTION_NAMES = {
     "read_weekly_pattern", "set_local_restrictions", "read_member_runtime",
     "read_member_temperature_history",
     "read_member_setpoint_history",
+    "read_daylight_settings",
 }
 
 
@@ -111,7 +112,7 @@ def test_all_actions_register_independently_and_idempotently(schedule_service, p
     c.services.async_setup_services(c.hass)
 
     assert set(c.hass.services.registered) == {("ae200", name) for name in ACTION_NAMES}
-    assert c.hass.services.registrations == 9 - len(preexisting)
+    assert c.hass.services.registrations == len(ACTION_NAMES) - len(preexisting)
     for name in ACTION_NAMES:
         registered = c.hass.services.registered["ae200", name]
         if name in sentinels:

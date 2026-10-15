@@ -192,4 +192,4 @@ def test_runtime_action_metadata_matches_explicit_read_contract(runtime_service)
     yaml = (component / "services.yaml").read_text().split("read_member_runtime:\n", 1)[1]
     assert "config_entry:" in yaml and "integration: ae200" in yaml
     assert "date:" in yaml and "- FAN_TIME" in yaml and "- THERMO_TIME" in yaml
-    assert yaml.count("required: true") == 4
+    assert yaml.split("\nread_daylight_settings:", 1)[0].count("required: true") == 4
