@@ -6,6 +6,7 @@ import asyncio
 import json
 import time
 import xml.etree.ElementTree as ET
+from types import SimpleNamespace
 
 import pytest
 from pymelans.exceptions import MelansConnectionError, MelansProtocolError
@@ -280,6 +281,19 @@ async def test_later_rejected_command_is_not_overwritten_by_earlier_readback(cli
 @pytest.mark.asyncio
 async def test_transport_requests_are_serialised_and_paced(client, monkeypatch):
     monkeypatch.setattr(const, "MIN_REQUEST_SPACING", 0.02)
+    clock = SimpleNamespace(now=100.0)
+    real_sleep = asyncio.sleep
+    delays = []
+
+    async def advance(delay):
+        delays.append(delay)
+        clock.now += delay
+        await real_sleep(0)
+
+    # Windows' coarse wall-clock ticks make sub-20ms timing assertions flaky.
+    # Advance only the client's clock, retaining real task scheduling and lock.
+    monkeypatch.setattr("pymelans.client.time", SimpleNamespace(monotonic=lambda: clock.now))
+    monkeypatch.setattr("pymelans.client.asyncio", SimpleNamespace(sleep=advance))
     starts = []
     concurrent = 0
     peak = 0
@@ -288,15 +302,16 @@ async def test_transport_requests_are_serialised_and_paced(client, monkeypatch):
         nonlocal concurrent, peak
         concurrent += 1
         peak = max(peak, concurrent)
-        starts.append(time.monotonic())
-        await asyncio.sleep(0.005)
+        starts.append(clock.now)
+        await real_sleep(0)
         concurrent -= 1
         return ACK
 
     client._ws.request = reply
     await asyncio.gather(*(client._request("fixture") for _ in range(3)))
     assert peak == 1
-    assert all(b - a >= 0.018 for a, b in zip(starts, starts[1:]))
+    assert len(delays) == 2
+    assert all(b - a == pytest.approx(0.02) for a, b in zip(starts, starts[1:]))
 
 
 @pytest.mark.asyncio

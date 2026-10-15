@@ -153,7 +153,9 @@ Static evidence establishes the official `WPatternList` request builder,
 single-combination selectors, record fields and editor boundaries. One
 minimal live websocket GET for one group/season/pattern combination returned
 zero records and passed strict parsing without issues. It did not read all
-slots or a complete directory. HA action deployment acceptance remains pending.
+slots or a complete directory. Deployed HA acceptance also confirmed a fresh
+successful empty action response matching the selected cache exactly, with
+existing entity identifiers and automations preserved.
 
 Only the empty-list response structure has live protocol evidence. It does
 not establish that scheduling is disabled, inactive or empty in other slots.

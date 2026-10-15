@@ -87,3 +87,31 @@ read_weekly_pattern:
           max: 7
           step: 1
           mode: box
+set_local_restrictions:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: ae200
+    group_id:
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 50
+          step: 1
+          mode: box
+    power_prohibited:
+      selector:
+        boolean:
+    mode_prohibited:
+      selector:
+        boolean:
+    temperature_prohibited:
+      selector:
+        boolean:
+    filter_reset_prohibited:
+      selector:
+        boolean:

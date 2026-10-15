@@ -57,6 +57,7 @@ class HttpTransport:
         self._timeout = aiohttp.ClientTimeout(total=timeout)
 
     async def request(self, payload: str) -> str:
+        command = _packet_command(payload)
         if self._session is None:
             self._session = aiohttp.ClientSession()
         try:
@@ -65,10 +66,19 @@ class HttpTransport:
                 data=payload.encode("utf-8"),
                 headers={"Content-Type": "text/xml"},
                 timeout=self._timeout,
+                allow_redirects=False,
             ) as resp:
                 resp.raise_for_status()
                 return await resp.text()
+        except UnicodeDecodeError as exc:
+            raise MelansProtocolError("invalid HTTP response encoding") from exc
         except (TimeoutError, aiohttp.ClientError) as exc:
+            if command == "setRequest" and not isinstance(
+                exc, (aiohttp.ClientConnectorError, aiohttp.InvalidURL),
+            ):
+                raise MelansCommandUncertainError(
+                    "HTTP command request began but acknowledgement was not received"
+                ) from exc
             raise MelansConnectionError(f"HTTP request failed: {exc}") from exc
 
     async def close(self) -> None:

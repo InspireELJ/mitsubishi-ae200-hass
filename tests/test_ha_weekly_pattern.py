@@ -192,6 +192,7 @@ def test_weekly_action_metadata_matches_schema_and_response_contract(weekly_serv
     assert set(action["fields"]) == set(DATA)
     assert all(field["name"] and field["description"] for field in action["fields"].values())
     yaml = (component / "services.yaml").read_text().split("read_weekly_pattern:\n", 1)[1]
+    yaml = yaml.split("set_local_restrictions:\n", 1)[0]
     assert "config_entry:" in yaml and "integration: ae200" in yaml
     assert yaml.count("required: true") == 4
     assert "max: 50" in yaml and "max: 5\n" in yaml and "max: 7" in yaml

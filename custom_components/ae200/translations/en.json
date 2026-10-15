@@ -30,6 +30,36 @@
     }
   },
   "services": {
+    "set_local_restrictions": {
+      "name": "Set local remote restrictions",
+      "description": "Change selected functions on one group's local remote. Requires current data from a supported air-conditioning group. Supply at least one restriction; omitted functions keep their effective settings. Returns this transaction's report; an acknowledgement alone is not confirmation by readback.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Controller",
+          "description": "The AE-200 configuration entry to change. Select it explicitly even when only one controller is configured."
+        },
+        "group_id": {
+          "name": "Group number",
+          "description": "One configured group number from 1 to 50 on the selected controller."
+        },
+        "power_prohibited": {
+          "name": "Prohibit local power control",
+          "description": "True prohibits on/off changes on the local remote; false permits them. Omit to keep its effective setting."
+        },
+        "mode_prohibited": {
+          "name": "Prohibit local mode control",
+          "description": "True prohibits operating mode changes on the local remote; false permits them. Omit to keep its effective setting."
+        },
+        "temperature_prohibited": {
+          "name": "Prohibit local temperature control",
+          "description": "True prohibits set temperature changes on the local remote; false permits them. Omit to keep its effective setting."
+        },
+        "filter_reset_prohibited": {
+          "name": "Prohibit local filter reset",
+          "description": "True prohibits filter reminder reset on the local remote; false permits it. Omit to keep its effective setting. This does not reset the reminder itself."
+        }
+      }
+    },
     "read_weekly_pattern": {
       "name": "Read weekly pattern",
       "description": "Read one group's weekly pattern for an explicit season and pattern number. Returns a snapshot without enabling it or assigning a weekday. Reads share a minimum 15 second interval.",
