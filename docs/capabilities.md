@@ -32,7 +32,22 @@ Implementation status has a separate meaning:
 - **Planned**: a candidate requiring implementation, additional protocol
   evidence or a suitable device. It is not currently a supported HA feature.
 
-## Scope of 0.2.0b3
+## Scope of 0.2.0b4
+
+The native integration now reads configured membership once after the first
+successful group refresh. Its on-demand `ae200.read_member` action reads one
+allowlisted indoor member, with independent freshness and a controller-wide
+15-second cooldown. There is no automatic member polling or new operating-state
+entity. See [member diagnostics](member-diagnostics.md) for the action and its
+limits. The websocket transport now waits through bounded notifications and
+KeepAlive frames for the actual request response.
+
+Live evidence includes a configured directory and one member's complete
+ErrorSign, AlarmCode, ThermoStatus and FanStatus response. The pilot firmware
+rejected DefrostStatus; default requests omit it. Status strings remain raw,
+and no hvac_action or compressor/energy inference is introduced.
+
+## Climate scope introduced in 0.2.0b3
 
 The native HACS integration loads a bounded, optional capability table at setup
 or reload. For verified ordinary indoor AC groups it narrows operating modes,
@@ -91,9 +106,9 @@ behaviour and diagnostic entities described here apply to HACS.
 | Cached diagnostics and command confirmation | Implemented; capability details and optional command-status entity added in 0.2.0b3 | Cached exporter and checked write acknowledgement/readback implementation. | Keep diagnostics free of additional controller requests and distinguish acceptance from confirmed state. The new status sensor is disabled by default. |
 | General local remote lock | Implemented legacy switch | Existing `RemoCon` setter and state parser. | This switch is retained for compatibility and is not yet gated by the newly read prohibition capability flags. Verify applicability before using it on another device family. |
 | Per-function local remote prohibitions | Planned | Official client separates drive, mode, temperature, filter reset, vane, fan and timer prohibition items. | Confirm the desired scope and each write/readback. These flags restrict local controls; they are not hardware capability flags. |
-| Group members, M-NET addresses and equipment family | Planned | Official `MnetGroupList` model includes equipment type and membership fields. | Read configured membership only, define stable device relationships, and distinguish protocol family codes from a manufacturer's full model designation. |
+| Group members, M-NET addresses and equipment family | Implemented as cached read-only diagnostics in 0.2.0b4 | Official `MnetGroupList` model and live configured membership. | Broaden representative multi-member hardware acceptance before creating additional devices or changing entity relationships. |
 | Detailed equipment identity and capacities | Planned | Address-level models include model, capacity, location and system codes. | Confirm which codes are populated and obtain an authoritative decoding before presenting a model or capacity as fact. |
-| Actual Thermo-ON, fan and defrost state | Planned | Address-level official client fields; official BACnet manual independently describes Thermo-ON state. | Validate XML values and group aggregation. Power on and a cooling mode do not prove active cooling or compressor operation. |
+| Actual Thermo-ON, fan and defrost state | Raw on-demand member diagnostics in 0.2.0b4; operational entities planned | Complete live ThermoStatus/FanStatus strings and a fan-only test. DefrostStatus rejected by pilot firmware. | Validate XML value semantics and group aggregation. Power on and a cooling mode do not prove active cooling or compressor operation. |
 | Active fault codes and fault history | Planned | Official address-level alarm fields and `AlarmList` request/parser models. | Confirm active versus recovered records, timestamps, bounded history size and code interpretation. Keep reset/clear operations separate from monitoring. |
 | Controller schedule enabled flag | Implemented read-only diagnostic in 0.2.0b3, disabled by default | Existing cached `Schedule` values and offline entity contracts. | A valid ON/OFF flag describes enabled status, not whether an action is currently running. No schedule write is implemented. |
 | Full controller schedule contents and editing | Planned | Official weekly season/pattern, yearly and today's schedule models. | Start with read-only inspection, document precedence with HA automations, then design explicit editing, backup and recovery. The current flags are not a complete schedule. |

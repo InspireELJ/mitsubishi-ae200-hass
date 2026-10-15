@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import math
+import re
 import time
 from datetime import UTC, datetime
 
 import aiohttp
 
-from . import capabilities, const, protocol
+from . import capabilities, const, protocol, topology
 from .device import MelansDevice
 from .exceptions import MelansConnectionError, MelansError
 from .transport import HttpTransport, WebsocketTransport
@@ -35,6 +36,21 @@ class MelansClient:
         self.devices: dict[str, MelansDevice] = {}
         self.group_capabilities: dict[str, dict[str, str]] = {}
         self.capability_error: str | None = None
+        self.topology: topology.MembershipSnapshot | None = None
+        self.topology_last_attempt: datetime | None = None
+        self.topology_last_success: datetime | None = None
+        self.topology_error: dict[str, str | None] | None = None
+        self.member_states: dict[str, dict[str, str]] = {}
+        self.member_last_attempt: dict[str, datetime] = {}
+        self.member_last_success: dict[str, datetime] = {}
+        self.member_errors: dict[str, dict[str, str | None]] = {}
+        self.member_issues: dict[str, tuple[topology.ParseIssue, ...]] = {}
+        self.member_read_status: dict[str, str] = {}
+        self._topology_attempted = False
+        self._topology_lock = asyncio.Lock()
+        self._member_lock = asyncio.Lock()
+        self._member_seen: dict[str, float] = {}
+        self._last_member_request: float | None = None
         self._write_spacing = max(write_spacing, const.MIN_WRITE_SPACING)
         self.stale_after = max(stale_after, const.MIN_POLL_INTERVAL)
         self._last_write = 0.0
@@ -149,6 +165,120 @@ class MelansClient:
             self.group_capabilities[gid] = data
             if gid in self.devices:
                 self.devices[gid].capability_attributes = dict(data)
+
+    @staticmethod
+    def _optional_read_error(error: MelansError) -> dict[str, str | None]:
+        """Retain a bounded error type/code, never a controller message or URL."""
+        code = getattr(error, "code", None)
+        if not isinstance(code, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,32}", code) is None:
+            code = None
+        return {"type": type(error).__name__, "code": code}
+
+    async def async_load_topology(self) -> None:
+        """Attempt the optional configured-member directory once per client.
+
+        No member status reads follow automatically. A directory failure does
+        not alter group monitoring, command confirmation or its freshness.
+        """
+        async with self._topology_lock:
+            if self._topology_attempted or not self._names:
+                return
+            self._topology_attempted = True
+            self.topology_last_attempt = datetime.now(UTC)
+            try:
+                response = await self._request(topology.build_membership_request())
+                snapshot = topology.parse_membership(response, expected_groups=self._names)
+            except MelansError as error:
+                self.topology_error = self._optional_read_error(error)
+                return
+            self.topology = snapshot
+            self.topology_last_success = datetime.now(UTC)
+            self.topology_error = None
+
+    @property
+    def allowed_member_addresses(self) -> tuple[str, ...]:
+        """Only unambiguous, configured indoor members have a verified read."""
+        snapshot = self.topology
+        if snapshot is None:
+            return ()
+        allowed = []
+        for address in snapshot.addresses:
+            records = [record for record in snapshot.records if record.address == address]
+            if records and all(
+                record.group_id in self._names
+                and record.model == "IC"
+                and all(issue == "duplicate_membership" for issue in record.issues)
+                for record in records
+            ):
+                allowed.append(address)
+        return tuple(allowed)
+
+    async def async_read_member(self, address: str | int) -> dict[str, str] | None:
+        """Explicitly read one known indoor member, with no background polling.
+
+        A cooldown, rejected response or read failure returns None. Historical
+        samples remain cached; callers must use member_quality for freshness.
+        Unknown, ambiguous and unsupported members raise before any I/O.
+        """
+        member = topology.normalise_address(address)
+        async with self._member_lock:
+            request = topology.build_address_request(
+                [member], allowed_addresses=self.allowed_member_addresses
+            )
+            if (
+                self._last_member_request is not None
+                and time.monotonic() - self._last_member_request < const.MIN_POLL_INTERVAL
+            ):
+                self.member_read_status[member] = "cooldown"
+                return None
+            self.member_last_attempt[member] = datetime.now(UTC)
+            try:
+                response = await self._request(request)
+                snapshot = topology.parse_address_state(response, expected_addresses=[member])
+            except MelansError as error:
+                self.member_errors[member] = self._optional_read_error(error)
+                self.member_read_status[member] = "error"
+                return None
+            finally:
+                # Base the cooldown on completion so waiting for normal group
+                # traffic cannot consume the entire optional-read interval.
+                self._last_member_request = time.monotonic()
+            self.member_issues[member] = snapshot.issues
+            attributes = snapshot.states.get(member)
+            if attributes is None:
+                self.member_errors[member] = {"type": "missing_or_invalid_member", "code": None}
+                self.member_read_status[member] = "error"
+                return None
+            groups = {
+                record.group_id for record in self.topology.records if record.address == member
+            }
+            group = attributes.get("Group")
+            model = attributes.get("Model")
+            if (
+                group not in (None, "", "*") and str(int(group)) not in groups
+                or model not in (None, "", "*", "IC")
+            ):
+                self.member_errors[member] = {"type": "member_identity_mismatch", "code": None}
+                self.member_read_status[member] = "error"
+                return None
+            self.member_states[member] = dict(attributes)
+            self.member_last_success[member] = datetime.now(UTC)
+            self._member_seen[member] = time.monotonic()
+            self.member_errors.pop(member, None)
+            self.member_read_status[member] = "updated"
+            return dict(attributes)
+
+    def member_quality(self, address: str | int) -> str:
+        """Address freshness is independent of group/controller availability."""
+        member = topology.normalise_address(address)
+        seen = self._member_seen.get(member)
+        if seen is None:
+            return "unknown"
+        return (
+            "fresh"
+            if member not in self.member_errors and time.monotonic() - seen <= self.stale_after
+            else "stale"
+        )
 
     async def async_update(self) -> dict[str, MelansDevice]:
         """Retain the historical cache for diagnostics, never as fresh data."""

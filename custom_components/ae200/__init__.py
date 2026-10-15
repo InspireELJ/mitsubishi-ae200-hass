@@ -6,9 +6,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_PREFER_WEBSOCKET, DEFAULT_PORT, DOMAIN
 from .coordinator import AE200Coordinator
+from .services import async_setup_services
 
 PLATFORMS: list[Platform] = [
     Platform.CLIMATE,
@@ -16,6 +18,12 @@ PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.SWITCH,
 ]
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register actions even when no controller entry is currently loaded."""
+    async_setup_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -30,6 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     try:
         await coordinator.async_config_entry_first_refresh()
+        await coordinator.client.async_load_topology()
     except Exception:
         await coordinator.client.close()
         raise
