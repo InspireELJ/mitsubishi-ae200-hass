@@ -71,7 +71,9 @@ a separate cached `schedule_available` attribute from `ScheduleAvail` while the
 entity is available. Neither flag proves that a pattern is active or executing.
 
 Version `0.2.0b10` adds a response-only action to change selected local remote
-functions for one known ordinary `IC` / `NORMAL` / `OLD` group. Strict boolean
+functions for one known ordinary `IC` / `NORMAL` / `OLD` group whose `SubModel`
+is explicitly the empty string. A missing, wildcard or unknown submodel does
+not satisfy this conservative pilot scope. Strict boolean
 fields merge against fresh effective restrictions, with fresh stop checks,
 one five-field command and one bounded readback. No-op requests do not write;
 acknowledgements, observed values and uncertain outcomes remain distinct.

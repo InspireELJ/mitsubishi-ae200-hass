@@ -27,7 +27,7 @@ _FUNCTION_FIELDS = (
     ("power", "DriveItem"), ("mode", "ModeItem"),
     ("temperature", "SetTempItem"), ("filter_reset", "FilterItem"),
 )
-_REQUIRED_CAPABILITIES = {"Model": "IC", "IcKind": "NORMAL", "GroupType": "OLD"}
+_REQUIRED_CAPABILITIES = {"Model": "IC", "SubModel": "", "IcKind": "NORMAL", "GroupType": "OLD"}
 _XML_DECL = '<?xml version="1.0" encoding="UTF-8"?>'
 _XML_WHITESPACE = re.compile(r"[ \t\r\n]*")
 
@@ -210,6 +210,8 @@ def plan_local_restrictions_patch(
     The caller must establish matching group capabilities, fresh observations,
     known inactive stop sources and the controller write lock before I/O. These
     requirements cannot be established by this pure planner's inputs alone.
+    An explicitly empty SubModel identifies the initial ordinary IC scope;
+    missing, unknown and other equipment subtypes are not equivalent to it.
     """
     if not isinstance(baseline, LocalRestrictions):
         raise ValueError("a validated local restriction baseline is required")

@@ -200,7 +200,7 @@ async def test_http_only_transaction_performs_one_set_and_one_bounded_observatio
     c = MelansClient("fixture.invalid", prefer_websocket=False, session=session, write_spacing=0)
     c._ws.request = AsyncMock(side_effect=AssertionError("HTTP-only client used websocket"))
     c._names = {"1": None}
-    c.devices["1"] = MelansDevice("1", None, {"Drive": "OFF", **RAW}, {"Model": "IC", "IcKind": "NORMAL", "GroupType": "OLD"})
+    c.devices["1"] = MelansDevice("1", None, {"Drive": "OFF", **RAW}, {"Model": "IC", "SubModel": "", "IcKind": "NORMAL", "GroupType": "OLD"})
     c._group_seen["1"] = time.monotonic()
     result = await c.async_set_local_restrictions("1", {"filter_reset": True})
     assert result["status"] == "outcome_unknown" and result["readback_matches"] is True

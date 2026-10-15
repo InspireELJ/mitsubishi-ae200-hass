@@ -36,7 +36,11 @@ Implementation status has a separate meaning:
 
 The response-only `ae200.set_local_restrictions` action applies a strict
 boolean patch to one explicitly selected configured `IC` / `NORMAL` / `OLD`
-group. It covers local power, mode, temperature and filter-reset restrictions.
+group with an explicitly empty `SubModel`. All four fields are required;
+missing, wildcard or unknown submodels are rejected without assuming ordinary
+IC. Other submodels await separate implementation and acceptance under this
+conservative pilot scope. It covers local power, mode, temperature and
+filter-reset restrictions.
 Omitted functions retain their freshly read effective settings. These are
 local AC operating restrictions, not account permissions, hardware capability
 flags or gates on central HA climate control.
@@ -273,7 +277,7 @@ behaviour and diagnostic entities described here apply to HACS.
 | Controller display model and versions | Cached read-only diagnostics in 0.2.0b5 | Official `SystemData` builder and live minimal response structure. | Preserve raw version strings and unknown fields; exclude serial numbers and network settings. This is a setup snapshot, not a periodic firmware monitor. |
 | Licence-status summary | Cached read-only diagnostics in 0.2.0b5 | Official `FunctionList` model and live directory response. | Verify each desired endpoint and connected hardware independently. Active licence status alone proves neither capability nor usable data; raw time limits are not computed expiry dates. |
 | Local remote prohibition summary | Implemented legacy switch; clarified in 0.2.0b6 | Existing `RemoCon` setter and state parser. | Preserve the old identifier and single-field write. Its on state alone does not prove that every local control is prohibited. |
-| Per-function local remote prohibitions | Read-only effective attributes from 0.2.0b6; scoped four-function write action in 0.2.0b10 | Official effective-state rule, one live filter-reset restriction change and private exact five-field restoration; HA action pending. | Accept the HA action, preserve unrequested effective values and exact restore evidence, and keep ACK/readback/uncertainty distinct. Other functions and physical wall-remote behaviour need separate acceptance. No central-command permission or CAS claim. |
+| Per-function local remote prohibitions | Read-only effective attributes from 0.2.0b6; scoped four-function write action in 0.2.0b10 | Official effective-state rule, verified IC/NORMAL/OLD plus explicitly empty SubModel profile, one live filter-reset restriction change and private exact five-field restoration; HA action pending. | Accept the HA action, preserve unrequested effective values and exact restore evidence, and keep ACK/readback/uncertainty distinct. Other functions, profiles and physical wall-remote behaviour need separate acceptance. No central-command permission or CAS claim. |
 | Global and group stop context | Explicit read-only diagnostic action in 0.2.0b6 | Official emergency-stop and energy-saving labels, strict minimal requests and live response structures. | Keep global/group freshness and errors separate. Stale typed values remain unknown, and no physical operation, cause, stop clearing or BACnet availability is inferred. |
 | Group members, M-NET addresses and equipment family | Implemented as cached read-only diagnostics in 0.2.0b4 | Official `MnetGroupList` model and live configured membership. | Broaden representative multi-member hardware acceptance before creating additional devices or changing entity relationships. |
 | Detailed equipment identity and capacities | Planned | Address-level models include model, capacity, location and system codes. | Confirm which codes are populated and obtain an authoritative decoding before presenting a model or capacity as fact. |

@@ -19,7 +19,7 @@ from pymelans.exceptions import (
 
 from pymelans import MelansClient, MelansDevice, cached_snapshot, const
 
-CAPS = {"Model": "IC", "IcKind": "NORMAL", "GroupType": "OLD"}
+CAPS = {"Model": "IC", "SubModel": "", "IcKind": "NORMAL", "GroupType": "OLD"}
 FIELDS = ("DriveItem", "ModeItem", "SetTempItem", "FilterItem")
 RAW = {"RemoCon": "PERMIT", **dict.fromkeys(FIELDS, "CHK_ON")}
 EXPECTED = {"RemoCon": "PROHIBIT", "DriveItem": "CHK_OFF", "ModeItem": "CHK_OFF", "SetTempItem": "CHK_OFF", "FilterItem": "CHK_ON"}
@@ -184,6 +184,45 @@ async def test_freshness_and_exact_equipment_gates_precede_all_io(client, gate):
     with pytest.raises(ValueError):
         await c.async_set_local_restrictions("1", {"filter_reset": True})
     assert not wire.calls
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("submodel", [None, "HH", "EOA", "FUTURE", "*"])
+async def test_only_explicit_empty_ordinary_submodel_allows_any_transaction_io(client, submodel):
+    c, _, wire = client
+    if submodel is None:
+        c.devices["1"].capability_attributes.pop("SubModel")
+    else:
+        c.devices["1"].capability_attributes["SubModel"] = submodel
+    with pytest.raises(ValueError):
+        await c.async_set_local_restrictions("1", {"filter_reset": True})
+    assert not wire.calls and c.last_command is None
+    c._request.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("submodel", [None, "", "*", "HH", "EOA", "FUTURE"])
+async def test_capability_loader_preserves_explicit_empty_submodel_without_inventing_it(client, submodel):
+    c, _, _ = client
+    attributes = {**CAPS, "FanAutoSW": "", "AirAutoSW": "*"}
+    if submodel is None:
+        attributes.pop("SubModel")
+    else:
+        attributes["SubModel"] = submodel
+    c._request = AsyncMock(return_value=reply("Mnet", {"Group": "1", **attributes}))
+    await c.async_load_capabilities()
+    c._request.assert_awaited_once()
+    for cached in (c.group_capabilities["1"], c.devices["1"].capability_attributes):
+        if submodel in (None, "*"):
+            assert "SubModel" not in cached
+        else:
+            assert cached["SubModel"] == submodel
+        assert "FanAutoSW" not in cached and "AirAutoSW" not in cached
+    c._request.reset_mock()
+    if submodel != "":
+        with pytest.raises(ValueError):
+            await c.async_set_local_restrictions("1", {"filter_reset": True})
+        c._request.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -356,7 +395,7 @@ async def test_freshness_and_capability_are_rechecked_after_waiting_for_write_lo
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("changed", ["stale", "capability"])
+@pytest.mark.parametrize("changed", ["stale", "capability", "subtype"])
 async def test_group_gate_is_rechecked_after_pre_reads_before_any_set(client, changed):
     c, clock, wire = client
 
@@ -364,6 +403,8 @@ async def test_group_gate_is_rechecked_after_pre_reads_before_any_set(client, ch
         if kind == "baseline":
             if changed == "stale":
                 clock.now += c.stale_after + 1
+            elif changed == "subtype":
+                c.devices["1"].capability_attributes["SubModel"] = "HH"
             else:
                 c.devices["1"].capability_attributes["GroupType"] = "NEW"
 

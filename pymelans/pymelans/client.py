@@ -208,7 +208,8 @@ class MelansClient:
             data = {
                 key: value
                 for key, value in attrs.items()
-                if key in capabilities.READ_ATTRIBUTES and value not in ("", "*")
+                if key in capabilities.READ_ATTRIBUTES
+                and (value not in ("", "*") or key == "SubModel" and value == "")
             }
             self.group_capabilities[gid] = data
             if gid in self.devices:
@@ -847,7 +848,7 @@ class MelansClient:
         if not self.is_group_available(group):
             raise ValueError("local restrictions require a fresh available group")
         if any(device.capability_attributes.get(key) != value for key, value in (
-            ("Model", "IC"), ("IcKind", "NORMAL"), ("GroupType", "OLD"),
+            ("Model", "IC"), ("SubModel", ""), ("IcKind", "NORMAL"), ("GroupType", "OLD"),
         )):
             raise ValueError("local restrictions require a known OLD NORMAL IC group")
         return device

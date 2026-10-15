@@ -7,7 +7,9 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 - Response-only `ae200.set_local_restrictions` action for one explicit entry
-  and configured `IC` / `NORMAL` / `OLD` group. A strict boolean patch changes
+  and configured `IC` / `NORMAL` / `OLD` group with an explicitly empty
+  `SubModel`. Missing, wildcard and unknown submodels are rejected rather than
+  being interpreted as ordinary IC. A strict boolean patch changes
   selected local power, mode, temperature or filter-reset permissions while
   preserving the unrequested effective restrictions.
 - Shared-write-lock prerequisite reads, a complete five-field baseline and
@@ -31,6 +33,9 @@ All notable changes to this project are documented here. The format is based on
   acceptance remains pending; physical wall-remote buttons were not tested.
 - Shared locks do not provide a controller-side compare-and-set guarantee
   against external writers.
+- A separate minimal capability read confirmed the four-field pilot profile.
+  Other submodels remain outside this release's scope pending their own
+  implementation and acceptance; this is not an incompatibility finding.
 - The legacy `RemoCon` switch, cached effective attributes, existing identifiers
   and central climate controls are preserved. Changing a local filter-reset
   restriction does not reset the filter reminder or clear a fault.

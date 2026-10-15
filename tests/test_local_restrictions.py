@@ -22,7 +22,7 @@ from pymelans.local_restrictions import (
 
 from pymelans import protocol
 
-CAPABILITIES = {"Model": "IC", "IcKind": "NORMAL", "GroupType": "OLD"}
+CAPABILITIES = {"Model": "IC", "SubModel": "", "IcKind": "NORMAL", "GroupType": "OLD"}
 FIELDS = ("DriveItem", "ModeItem", "SetTempItem", "FilterItem")
 FUNCTIONS = ("power", "mode", "temperature", "filter_reset")
 RAW = {"RemoCon": "PERMIT", **dict.fromkeys(FIELDS, "CHK_OFF")}
@@ -154,6 +154,7 @@ def test_patch_validation_exports_an_independent_copy_before_io():
     ("Model", None), ("Model", ""), ("Model", "*"), ("Model", "LC"), ("Model", "ic"),
     ("IcKind", None), ("IcKind", ""), ("IcKind", "*"), ("IcKind", "HH"),
     ("GroupType", None), ("GroupType", "*"), ("GroupType", "NEW"), ("GroupType", "old"),
+    ("SubModel", None), ("SubModel", "HH"), ("SubModel", "EOA"), ("SubModel", "FUTURE"), ("SubModel", "*"),
 ])
 def test_only_exact_known_old_normal_ic_capability_fields_allow_planning(key, bad):
     capabilities = {**CAPABILITIES}

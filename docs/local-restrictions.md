@@ -25,16 +25,20 @@ integration entry and one configured group. The group must be in the 1–50
 range and in that controller's configured-group allowlist. There is no all-group,
 address-level or wildcard target.
 
-All three reported capability fields must be known and match exactly:
+All four reported capability fields must be present and match exactly:
 
 | Capability field | Required value |
 |---|---|
 | `Model` | `IC` |
+| `SubModel` | Explicit empty string `""` |
 | `IcKind` | `NORMAL` |
 | `GroupType` | `OLD` |
 
+An absent, wildcard or unknown `SubModel` is not treated as an empty value.
 `NEW`, missing capabilities, other indoor-unit variants and other equipment
-families are not covered by this action. The selected group's normal state
+families are outside this conservative pilot scope and need their own
+implementation and acceptance. Exclusion does not establish incompatibility.
+The selected group's normal state
 must also be fresh and successful. A partial permissions read does not
 establish fresh power, mode, temperature or other climate state.
 
@@ -214,6 +218,8 @@ changing only the local filter-reset prohibition from permitted to prohibited.
 The five-field command was acknowledged and its complete readback matched.
 The other three effective restrictions and operating settings were unchanged.
 This did not reset a filter reminder or test physical wall-remote buttons.
+A separate minimal read confirmed all four capability fields, including the
+explicitly empty `SubModel`, for that pilot profile.
 
 The private acceptance tool retained the exact original five raw permission
 fields, their four effective values and full relevant operating-state evidence.
