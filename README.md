@@ -3,6 +3,8 @@
 ## InspireELJ internal pilot
 
 This source targets the `0.2.1b7` optional-read cancellation and diagnostic fixes.
+For daily controls, action parameters and maintenance, see the
+[Chinese operator guide](docs/operator-guide-zh.md).
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
 [deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
@@ -174,6 +176,12 @@ cancellation and respect completion cooldowns. Control-context records stay
 independent and cancellation starts no further GET. Group-poll errors also
 receive bounded tokens and diagnostic exports no longer alias the live error
 cache. These offline-tested fixes add no API, polling or control operation.
+Deployed HA normal-operation regression confirmed the matching integration
+and bundled-library version, retained identifiers, operating settings,
+permissions and automations, and the unchanged Clock action/cache contract.
+Cancellation, malformed-error and mutation-isolation cases remain offline
+evidence; no live outage or fault was injected and the default-disabled
+command sensor was not enabled for testing.
 See [diagnostic state quality](docs/diagnostic-state-quality.md).
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
