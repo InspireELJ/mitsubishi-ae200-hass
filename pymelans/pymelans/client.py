@@ -6,6 +6,7 @@ import asyncio
 import math
 import re
 import time
+from collections import OrderedDict
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
@@ -18,6 +19,7 @@ from . import (
     control_context,
     controller_clock,
     local_restrictions,
+    member_runtime,
     metadata,
     protocol,
     today_schedule,
@@ -83,6 +85,9 @@ class MelansClient:
         self._last_weekly_pattern_request: float | None = None
         self._weekly_patterns: dict[tuple[str, str, str], dict[str, Any]] = {}
         self._weekly_read_status: dict[tuple[str, str, str], str] = {}
+        self._member_runtime_lock = asyncio.Lock()
+        self._last_member_runtime_request: float | None = None
+        self._member_runtimes: OrderedDict[tuple[str, str, str], dict[str, Any]] = OrderedDict()
         self.topology: topology.MembershipSnapshot | None = None
         self.topology_last_attempt: datetime | None = None
         self.topology_last_success: datetime | None = None
@@ -486,6 +491,92 @@ class MelansClient:
                 {"kind": issue.kind, "record_index": issue.record_index, "key": issue.key}
                 for issue in sample.issues
             ] if sample else [],
+        }
+
+    async def async_read_member_runtime(
+        self, address: str | int, date_iso: str, data_name: str,
+    ) -> dict[str, Any]:
+        """Read one verified IC member/day without aggregating or polling history."""
+        selector = member_runtime._selector(address, date_iso, data_name)
+        member = selector["Address"]
+        if member not in self.allowed_member_addresses:
+            raise ValueError("address is outside the configured IC member allowlist")
+        key = (member, date_iso, data_name)
+        async with self._member_runtime_lock:
+            if member not in self.allowed_member_addresses:
+                raise ValueError("address is outside the configured IC member allowlist")
+            if (
+                self._last_member_runtime_request is not None
+                and time.monotonic() - self._last_member_runtime_request < const.MIN_POLL_INTERVAL
+            ):
+                result = self.member_runtime_snapshot(*key)
+                result["read_status"] = "cooldown"
+                return result
+            record = self._member_runtimes.setdefault(key, {})
+            self._member_runtimes.move_to_end(key)
+            # Local retention only. Do not enumerate dates or let optional
+            # historical requests grow the integration's memory without bound.
+            while len(self._member_runtimes) > 32:
+                self._member_runtimes.popitem(last=False)
+            record["last_attempt"] = datetime.now(UTC)
+            try:
+                response = await self._request(member_runtime.build_member_runtime_request(*key))
+                sample = member_runtime.parse_member_runtime(
+                    response, expected_address=member, expected_date=date_iso,
+                    expected_data_name=data_name,
+                )
+            except MelansError as error:
+                record["error"] = self._optional_read_error(error)
+                record["read_status"] = "error"
+            else:
+                record.update(sample=sample, last_success=datetime.now(UTC),
+                              seen=time.monotonic(), error=None, read_status="updated")
+            finally:
+                self._last_member_runtime_request = time.monotonic()
+            return self.member_runtime_snapshot(*key)
+
+    def member_runtime_snapshot(
+        self, address: str | int | None = None, date_iso: str | None = None,
+        data_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Export historical reported buckets, without statistics or current-state claims."""
+        if address is None and date_iso is None and data_name is None:
+            result: dict[str, Any] = {}
+            for member, day, name in sorted(
+                self._member_runtimes, key=lambda key: (int(key[0]), key[1], key[2]),
+            ):
+                result.setdefault(member, {}).setdefault(day, {})[name] = (
+                    self.member_runtime_snapshot(member, day, name)
+                )
+            return result
+        selector = member_runtime._selector(address, date_iso, data_name)
+        member = selector["Address"]
+        record = self._member_runtimes.get((member, date_iso, data_name), {})
+        sample = record.get("sample")
+        seen = record.get("seen")
+        fresh = (
+            seen is not None and not record.get("error")
+            and time.monotonic() - seen <= self.stale_after
+        )
+        return {
+            "address": member, "date_iso": date_iso, "data_name": data_name,
+            "read_status": record.get("read_status", "unknown"),
+            "quality": "fresh" if fresh else "stale" if seen is not None else "unknown",
+            "last_attempt": record["last_attempt"].isoformat() if record.get("last_attempt") else None,
+            "last_successful_read": record["last_success"].isoformat() if record.get("last_success") else None,
+            "error": dict(record["error"]) if record.get("error") else None,
+            "record_count": sample.record_count if sample else None,
+            "raw_attributes": sample.raw_attributes() if sample else {},
+            "raw_tokens": list(sample.raw_tokens) if sample else [],
+            "unit": "min", "interval_minutes": 30, "timezone": None,
+            "buckets": [
+                {"index": bucket.index, "start_time": bucket.start_time,
+                 "end_time": bucket.end_time, "raw_token": bucket.raw_token,
+                 "reported_minutes": bucket.minutes if fresh else None}
+                for bucket in sample.buckets
+            ] if sample else [],
+            "issues": [{"key": issue.key, "kind": issue.kind} for issue in sample.issues]
+            if sample else [],
         }
 
     async def async_read_controller_clock(self) -> dict[str, Any]:

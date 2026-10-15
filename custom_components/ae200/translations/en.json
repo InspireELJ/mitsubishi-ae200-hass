@@ -30,6 +30,28 @@
     }
   },
   "services": {
+    "read_member_runtime": {
+      "name": "Read member runtime",
+      "description": "Read one configured indoor unit's reported runtime history for one explicit date and channel. Returns a snapshot without summing intervals or inferring current operation. Reads share a minimum 15 second interval.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Controller",
+          "description": "The AE-200 configuration entry to read from. Select it explicitly even when only one controller is configured."
+        },
+        "address": {
+          "name": "Member address",
+          "description": "One configured indoor unit bus address from 1 to 250, verified by cached topology. This is not a group number."
+        },
+        "date_iso": {
+          "name": "Date",
+          "description": "One controller-local calendar date in YYYY-MM-DD form. The pilot accepts years 1970 to 2037; availability of history is not guaranteed."
+        },
+        "data_name": {
+          "name": "Data name",
+          "description": "Select FAN_TIME or THERMO_TIME. Values are controller-reported history and do not establish live operation or verified measurement."
+        }
+      }
+    },
     "set_local_restrictions": {
       "name": "Set local remote restrictions",
       "description": "Change selected functions on one group's local remote. Requires current data from a supported air-conditioning group. Supply at least one restriction; omitted functions keep their effective settings. Returns this transaction's report; an acknowledgement alone is not confirmation by readback.",

@@ -2,8 +2,9 @@
 
 Version `0.2.0b10` adds the response-only `ae200.set_local_restrictions` action.
 A limited live protocol change and private exact restoration have passed
-acknowledgement/readback checks. Deployed HA action acceptance remains pending;
-physical wall-remote button behaviour was not tested.
+acknowledgement/readback checks. Deployed HA actions have also confirmed the
+selected filter-reset restriction and exact restoration. Physical wall-remote
+button behaviour was not tested.
 
 The action changes selected functions on one group's local wall or
 handset remote. It can prohibit local power, operating-mode, temperature or
@@ -228,6 +229,14 @@ received an acknowledgement and matched the complete restoration readback.
 A full operating-state check also matched the original evidence. This
 validates the selected protocol operation and restoration on that group,
 not the behaviour of every local interface, function or equipment family.
+
+The deployed HA action has also passed the same limited set/restore workflow:
+both invocations were confirmed, unrequested effective restrictions were
+preserved and the final five raw fields matched the private original tuple.
+The normal group cache and last-command evidence matched the restoration;
+existing identifiers, OFF states and the enabled scheduled automation were
+preserved. This does not extend acceptance to other function writes or to
+physical wall-remote buttons.
 
 Exact restoration is a separate, private acceptance operation, not a public
 raw-write service or an automatic error handler. It must restore the captured

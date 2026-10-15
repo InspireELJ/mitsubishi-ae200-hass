@@ -24,7 +24,7 @@ promise of support:
 
 Implementation status has a separate meaning:
 
-- **Implemented**: present in the `0.2.0b10` source. Individual device support
+- **Implemented**: present in the `0.2.1b1` source. Individual device support
   and end-to-end acceptance still apply. This is not a claim that every row has
   passed a live control test or that an installation has loaded this version.
 - **Shared library only**: protocol support exists without a complete native HA
@@ -32,7 +32,37 @@ Implementation status has a separate meaning:
 - **Planned**: a candidate requiring implementation, additional protocol
   evidence or a suitable device. It is not currently a supported HA feature.
 
-## Scope of 0.2.0b10
+## Scope of 0.2.1b1
+
+The response-only `ae200.read_member_runtime` action requires an explicit
+entry, topology-validated IC address, strict Gregorian `date_iso` and one
+`data_name`: `FAN_TIME` or `THERMO_TIME`. One GET requests exactly that selector.
+There is no startup read, periodic trend poll, automatic date/channel scan,
+new entity or control. See [member runtime diagnostics](member-runtime.md).
+The runtime channel uses the verified `Model=IC` member allowlist, without the
+separate local-restrictions write action's empty-SubModel gate. Actual HH/EOA
+hardware and logging still require their own live acceptance.
+
+Independent raw samples and nullable buckets have their own attempt and
+success times, errors and freshness. The controller-wide cooldown is 15 seconds
+from completion. At most 32 selector samples are retained by a local LRU
+policy; this is not server capacity, retention or evidence of available days.
+Cached diagnostic export performs no I/O and does not refresh climate state.
+
+The official IC member daily channel provides the intended 48 half-hour intervals
+in minutes. Only a fresh exact-48-token sample can provide nullable typed
+minute values; stale or unknown values retain raw evidence without becoming
+zero. The single-record and attribute limits, 1970–2037 date window and typed
+0–30-minute range are defensive local pilot policies. They are not verified
+wire limits, history retention or backend capacity guarantees.
+
+One live `FAN_TIME` response contained 48 zero tokens, confirming the request
+and CSV shape. It does not establish measured idle time, logging validity,
+non-zero runtime or `THERMO_TIME` support. HA action acceptance is pending.
+No daily total, statistics, cross-member sum, current running-state inference,
+timezone, UTC conversion or DST adjustment is introduced.
+
+## Local-restrictions scope introduced in 0.2.0b10
 
 The response-only `ae200.set_local_restrictions` action applies a strict
 boolean patch to one explicitly selected configured `IC` / `NORMAL` / `OLD`
@@ -67,9 +97,10 @@ success. A matching readback cannot replace a missing acknowledgement.
 
 One idle ordinary group passed a local filter-reset restriction change and
 private exact five-field restoration with acknowledgement/readback checks.
-Other effective restrictions and operating settings were preserved. HA action
-deployment acceptance remains pending, and physical wall-remote buttons were
-not tested. A shared client lock cannot prevent external controller
+Other effective restrictions and operating settings were preserved. Deployed
+HA actions also confirmed that selected filter-reset restriction and exact
+restoration, retaining identifiers and automations. Physical wall-remote
+buttons were not tested. A shared client lock cannot prevent external controller
 writers; no server-side compare-and-set or rollback guarantee is claimed.
 
 ## Weekly-pattern scope introduced in 0.2.0b9
@@ -277,7 +308,7 @@ behaviour and diagnostic entities described here apply to HACS.
 | Controller display model and versions | Cached read-only diagnostics in 0.2.0b5 | Official `SystemData` builder and live minimal response structure. | Preserve raw version strings and unknown fields; exclude serial numbers and network settings. This is a setup snapshot, not a periodic firmware monitor. |
 | Licence-status summary | Cached read-only diagnostics in 0.2.0b5 | Official `FunctionList` model and live directory response. | Verify each desired endpoint and connected hardware independently. Active licence status alone proves neither capability nor usable data; raw time limits are not computed expiry dates. |
 | Local remote prohibition summary | Implemented legacy switch; clarified in 0.2.0b6 | Existing `RemoCon` setter and state parser. | Preserve the old identifier and single-field write. Its on state alone does not prove that every local control is prohibited. |
-| Per-function local remote prohibitions | Read-only effective attributes from 0.2.0b6; scoped four-function write action in 0.2.0b10 | Official effective-state rule, verified IC/NORMAL/OLD plus explicitly empty SubModel profile, one live filter-reset restriction change and private exact five-field restoration; HA action pending. | Accept the HA action, preserve unrequested effective values and exact restore evidence, and keep ACK/readback/uncertainty distinct. Other functions, profiles and physical wall-remote behaviour need separate acceptance. No central-command permission or CAS claim. |
+| Per-function local remote prohibitions | Read-only effective attributes from 0.2.0b6; scoped four-function write action in 0.2.0b10 | Official rule and verified plain IC/NORMAL/OLD profile; selected filter-reset protocol change/restoration and deployed HA actions accepted. | Preserve unrequested effective values and exact restore evidence, and keep ACK/readback/uncertainty distinct. Other functions, profiles and physical wall-remote behaviour need separate acceptance. No central-command permission or CAS claim. |
 | Global and group stop context | Explicit read-only diagnostic action in 0.2.0b6 | Official emergency-stop and energy-saving labels, strict minimal requests and live response structures. | Keep global/group freshness and errors separate. Stale typed values remain unknown, and no physical operation, cause, stop clearing or BACnet availability is inferred. |
 | Group members, M-NET addresses and equipment family | Implemented as cached read-only diagnostics in 0.2.0b4 | Official `MnetGroupList` model and live configured membership. | Broaden representative multi-member hardware acceptance before creating additional devices or changing entity relationships. |
 | Detailed equipment identity and capacities | Planned | Address-level models include model, capacity, location and system codes. | Confirm which codes are populated and obtain an authoritative decoding before presenting a model or capacity as fact. |
@@ -288,7 +319,7 @@ behaviour and diagnostic entities described here apply to HACS.
 | Controller local clock | Explicit read-only diagnostic action in 0.2.0b8 | Official six-field model, one minimal live GET and deployed HA action/cache acceptance. | Preserve local fields and unknowns. Validate Gregorian date/time before producing an offset-free local datetime; no timezone, DST, drift or atomic schedule-date inference. |
 | Single-group weekly pattern | Explicit read-only diagnostic action in 0.2.0b9 | Official `WPatternList` builder, one single-selector empty live response and deployed HA action/cache acceptance. | Preserve unknowns and independent freshness, and verify non-empty actions separately. No automatic 35-slot scan, activation, execution, clock-date binding or server-capacity claim. |
 | Yearly patterns, season activation and schedule editing | Planned | Official season, annual-pattern and yearly-directory models. | Establish separately bounded request scopes and activation/precedence semantics. A today or single weekly-pattern sample is not the complete controller schedule. Design editing, backup and recovery separately after read-only acceptance. |
-| Runtime and Thermo-ON time | Planned | Official runtime/account and trend models. | Confirm units, counter resets, bucket boundaries and aggregation before creating HA statistics. |
+| Member daily runtime and Thermo-ON history | On-demand raw and nullable-bucket diagnostic in 0.2.1b1; statistics and entities planned separately | Official IC daily graph grammar and one selected 48-zero FAN_TIME response; HA action pending. | Validate non-zero data, collection quality, THERMO_TIME, missing/partial/DST samples and provenance before totals or HA statistics. Numeric zero and licence active do not establish measured idle time. |
 | Electrical power, energy, COP and apportionment | Planned | Official energy models and documented licensed functions. | Establish installed metering and licences, data provenance, units and reset semantics. Keep measured, estimated and apportioned energy distinct. |
 | Lossnay and ventilation | Shared library only for partial parsing; complete HA control planned | Official ventilation capability flags and enum algorithms. | Obtain meaningful data from a ventilation installation. AC placeholder fields cannot establish Lossnay support. |
 | ATW, hot-water heat pumps and chillers | Partial legacy classification/sensors exist; verified device-specific HA support planned | Official separate operating modes, temperature ranges and system models. | Validate a suitable device before claiming device-family control. The existing generic climate entity is not proof of a verified hydronic mode mapping. |
@@ -392,10 +423,11 @@ hardware functions solely because local controls are prohibited.
    separately from operational state. A server-side history bound
    must be established before introducing a history request; local truncation
    alone does not bound controller work.
-4. Implement runtime and energy only after confirming valid data and its
-   semantics. Decide whether data belongs in a current sensor, a diagnostic
-   export or a historical import rather than pushing every trend into a
-   frequently polled entity.
+4. Accept the bounded member-runtime diagnostic introduced in `0.2.1b1`
+   separately from collection validity or statistical support. Add totals,
+   runtime/energy entities or historical imports only after confirming valid
+   sources, units, missing data and aggregation. Keep trend inspection explicit
+   rather than adding a frequently polled entity.
 5. Add device-specific ventilation, hydronic and I/O platforms with representative
    fixtures and hardware acceptance. Keep HACS and the MQTT add-on consistent
    where they share an implemented capability; document any remaining gaps.
