@@ -198,6 +198,87 @@ def test_schedule_state_handles_disappearing_or_unknown_cache(observability_modu
     assert not entity.available
 
 
+@pytest.mark.parametrize("flag,available", [("OFF", "ON"), ("ON", "OFF"), ("ON", "ON"), ("OFF", "OFF")])
+def test_schedule_flag_and_availability_remain_independent_cached_fields(
+    observability_modules, flag, available
+):
+    c = coordinator()
+    c.data["1"].update({"Schedule": flag, "ScheduleAvail": available})
+    entity = observability_modules.binary_sensor.AE200ScheduleOn(c, "1")
+
+    assert entity._attr_unique_id == "fixture.invalid_1_schedule_on"
+    assert entity.is_on is (flag == "ON")
+    assert entity.extra_state_attributes == {
+        "schedule_available": available == "ON",
+        "raw_schedule_flag": flag,
+        "raw_schedule_available": available,
+    }
+    c.client.poll.assert_not_called()
+    c.client._request.assert_not_called()
+
+
+@pytest.mark.parametrize("value,raw", [(None, None), ("", ""), ("*", "*"), ("FUTURE", None), ("private.invalid", None)])
+def test_schedule_availability_unknowns_are_nullable_and_raw_values_allowlisted(
+    observability_modules, value, raw
+):
+    c = coordinator()
+    c.data["1"].update({"Schedule": value, "ScheduleAvail": value})
+    entity = observability_modules.binary_sensor.AE200ScheduleOn(c, "1")
+
+    assert entity.is_on is None
+    assert entity.extra_state_attributes == {
+        "schedule_available": None, "raw_schedule_flag": raw, "raw_schedule_available": raw,
+    }
+
+
+@pytest.mark.parametrize("failure", ["group", "coordinator", "missing"])
+def test_unavailable_schedule_never_claims_typed_availability(observability_modules, failure):
+    c = coordinator()
+    c.data["1"].update({"Schedule": "OFF", "ScheduleAvail": "ON"})
+    if failure == "group":
+        c.client.is_group_available = lambda _: False
+    elif failure == "coordinator":
+        c.last_update_success = False
+    else:
+        c.data.clear()
+    entity = observability_modules.binary_sensor.AE200ScheduleOn(c, "1")
+
+    assert not entity.available
+    assert entity.extra_state_attributes["schedule_available"] is None
+    assert entity.extra_state_attributes["raw_schedule_available"] == (None if failure == "missing" else "ON")
+    assert entity.is_on is (None if failure == "missing" else False)
+    c.client.poll.assert_not_called()
+    c.client._request.assert_not_called()
+
+
+def test_expired_schedule_sample_retains_raw_without_typed_availability(observability_modules, monkeypatch):
+    from datetime import UTC, datetime
+
+    from pymelans import MelansClient
+
+    c = coordinator()
+    c.client = MelansClient("fixture.invalid", stale_after=20)
+    c.data["1"].update({"Schedule": "ON", "ScheduleAvail": "ON"})
+    c.client.devices = c.data
+    c.client._group_seen = {"1": 100.0}
+    c.client.group_last_success = {"1": datetime.now(UTC)}
+    monkeypatch.setattr("pymelans.client.time.monotonic", lambda: 121.0)
+    entity = observability_modules.binary_sensor.AE200ScheduleOn(c, "1")
+
+    assert not entity.available
+    assert entity.is_on is True
+    assert entity.extra_state_attributes == {
+        "schedule_available": None, "raw_schedule_flag": "ON", "raw_schedule_available": "ON",
+    }
+
+
+def test_schedule_name_does_not_claim_availability_or_execution():
+    component = Path(__file__).resolve().parents[1] / "custom_components/ae200"
+    for path in (component / "strings.json", component / "translations/en.json"):
+        strings = json.loads(path.read_text())
+        assert strings["entity"]["binary_sensor"]["schedule_on"]["name"] == "Controller schedule flag"
+
+
 def test_existing_diagnostic_unique_ids_stay_compatible(observability_modules):
     c = coordinator()
     sensors = observability_modules.sensor
@@ -276,7 +357,7 @@ def test_observability_translations_are_synchronised():
     source = json.loads((component / "strings.json").read_text(encoding="utf-8"))
     english = json.loads((component / "translations/en.json").read_text(encoding="utf-8"))
     assert source == english
-    assert source["entity"]["binary_sensor"]["schedule_on"]["name"] == "Controller schedule enabled"
+    assert source["entity"]["binary_sensor"]["schedule_on"]["name"] == "Controller schedule flag"
     assert set(source["entity"]["sensor"]["last_command_status"]["state"]) == {
         "unknown", "pending", "accepted_unconfirmed", "not_yet_confirmed", "confirmed", "failed",
         "outcome_unknown"

@@ -20,6 +20,7 @@ from . import (
     protocol,
     today_schedule,
     topology,
+    weekly_pattern,
 )
 from .device import MelansDevice
 from .exceptions import MelansCommandUncertainError, MelansConnectionError, MelansError
@@ -71,6 +72,10 @@ class MelansClient:
         self._last_clock_request: float | None = None
         self._controller_clock: dict[str, Any] = {}
         self._clock_read_status = "unknown"
+        self._weekly_pattern_lock = asyncio.Lock()
+        self._last_weekly_pattern_request: float | None = None
+        self._weekly_patterns: dict[tuple[str, str, str], dict[str, Any]] = {}
+        self._weekly_read_status: dict[tuple[str, str, str], str] = {}
         self.topology: topology.MembershipSnapshot | None = None
         self.topology_last_attempt: datetime | None = None
         self.topology_last_success: datetime | None = None
@@ -390,6 +395,83 @@ class MelansClient:
                  "minute": entry.minute if fresh else None,
                  "raw_attributes": entry.raw_attributes(), "issues": list(entry.issues)}
                 for entry in sample.records
+            ] if sample else [],
+            "issues": [
+                {"kind": issue.kind, "record_index": issue.record_index, "key": issue.key}
+                for issue in sample.issues
+            ] if sample else [],
+        }
+
+    async def async_read_weekly_pattern(
+        self, group_id: str | int, season: str | int, pattern: str | int,
+    ) -> dict[str, Any]:
+        """Read one explicit configured selector without enumerating or enabling it."""
+        selector = weekly_pattern._selector(group_id, season, pattern)
+        group, season_key, pattern_key = (selector[key] for key in ("Group", "Season", "Pattern"))
+        if group not in self._names:
+            raise ValueError("group_id is outside the configured group allowlist")
+        key = (group, season_key, pattern_key)
+        async with self._weekly_pattern_lock:
+            if (
+                self._last_weekly_pattern_request is not None
+                and time.monotonic() - self._last_weekly_pattern_request < const.MIN_POLL_INTERVAL
+            ):
+                self._weekly_read_status[key] = "cooldown"
+                return self.weekly_pattern_snapshot(*key)
+            record = self._weekly_patterns.setdefault(key, {})
+            record["last_attempt"] = datetime.now(UTC)
+            try:
+                response = await self._request(weekly_pattern.build_weekly_pattern_request(*key))
+                sample = weekly_pattern.parse_weekly_pattern(
+                    response, expected_group=group, expected_season=season_key,
+                    expected_pattern=pattern_key,
+                )
+            except MelansError as error:
+                record["error"] = self._optional_read_error(error)
+                self._weekly_read_status[key] = "error"
+            else:
+                record.update(sample=sample, last_success=datetime.now(UTC),
+                              seen=time.monotonic(), error=None)
+                self._weekly_read_status[key] = "updated"
+            finally:
+                self._last_weekly_pattern_request = time.monotonic()
+            return self.weekly_pattern_snapshot(*key)
+
+    def weekly_pattern_snapshot(
+        self, group_id: str | int | None = None, season: str | int | None = None,
+        pattern: str | int | None = None,
+    ) -> dict[str, Any]:
+        """Export cached selectors only, without a weekday, activation or date claim."""
+        if group_id is None and season is None and pattern is None:
+            result: dict[str, Any] = {}
+            for group, season_key, pattern_key in sorted(
+                self._weekly_patterns, key=lambda key: tuple(map(int, key)),
+            ):
+                result.setdefault(group, {}).setdefault(season_key, {})[pattern_key] = (
+                    self.weekly_pattern_snapshot(group, season_key, pattern_key)
+                )
+            return result
+        selector = weekly_pattern._selector(group_id, season, pattern)
+        group, season_key, pattern_key = (selector[key] for key in ("Group", "Season", "Pattern"))
+        key = (group, season_key, pattern_key)
+        record = self._weekly_patterns.get(key, {})
+        sample = record.get("sample")
+        seen = record.get("seen")
+        fresh = (
+            seen is not None and not record.get("error")
+            and time.monotonic() - seen <= self.stale_after
+        )
+        return {
+            "group_id": group, "season": season_key, "pattern": pattern_key,
+            "read_status": self._weekly_read_status.get(key, "unknown"),
+            "quality": "fresh" if fresh else "stale" if seen is not None else "unknown",
+            "last_attempt": record["last_attempt"].isoformat() if record.get("last_attempt") else None,
+            "last_successful_read": record["last_success"].isoformat() if record.get("last_success") else None,
+            "error": dict(record["error"]) if record.get("error") else None,
+            "records": [
+                {"index": row.index, "raw_attributes": row.raw_attributes(),
+                 "hour": row.hour if fresh else None, "minute": row.minute if fresh else None,
+                 "issues": list(row.issues)} for row in sample.records
             ] if sample else [],
             "issues": [
                 {"kind": issue.kind, "record_index": issue.record_index, "key": issue.key}

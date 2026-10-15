@@ -14,7 +14,10 @@ import pytest
 import voluptuous as vol
 
 ROOT = Path(__file__).resolve().parents[1]
-ACTION_NAMES = {"read_member", "read_control_context", "read_today_schedule", "read_controller_clock"}
+ACTION_NAMES = {
+    "read_member", "read_control_context", "read_today_schedule", "read_controller_clock",
+    "read_weekly_pattern",
+}
 
 
 @pytest.fixture
@@ -96,7 +99,7 @@ def sample(*, status="updated", quality="fresh", records=None, group="4"):
     [(), ("read_member",), ("read_control_context",),
      ("read_member", "read_control_context"), ("read_today_schedule",)],
 )
-def test_all_three_actions_register_independently_and_idempotently(schedule_service, preexisting):
+def test_all_actions_register_independently_and_idempotently(schedule_service, preexisting):
     c = schedule_service
     sentinels = {name: {"handler": object()} for name in preexisting}
     for name, sentinel in sentinels.items():
@@ -106,7 +109,7 @@ def test_all_three_actions_register_independently_and_idempotently(schedule_serv
     c.services.async_setup_services(c.hass)
 
     assert set(c.hass.services.registered) == {("ae200", name) for name in ACTION_NAMES}
-    assert c.hass.services.registrations == 4 - len(preexisting)
+    assert c.hass.services.registrations == 5 - len(preexisting)
     for name in ACTION_NAMES:
         registered = c.hass.services.registered["ae200", name]
         if name in sentinels:

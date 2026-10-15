@@ -30,6 +30,28 @@
     }
   },
   "services": {
+    "read_weekly_pattern": {
+      "name": "Read weekly pattern",
+      "description": "Read one group's weekly pattern for an explicit season and pattern number. Returns a snapshot without enabling it or assigning a weekday. Reads share a minimum 15 second interval.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Controller",
+          "description": "The AE-200 configuration entry to read from. Select it explicitly even when only one controller is configured."
+        },
+        "group_id": {
+          "name": "Group number",
+          "description": "One configured group number from 1 to 50 on the selected controller."
+        },
+        "season": {
+          "name": "Season number",
+          "description": "One controller season number from 1 to 5. Its calendar assignment is not inferred."
+        },
+        "pattern": {
+          "name": "Pattern number",
+          "description": "One weekly pattern number from 1 to 7. This number is not treated as a weekday."
+        }
+      }
+    },
     "read_controller_clock": {
       "name": "Read controller clock",
       "description": "Read the controller's local wall clock on demand. Returns a snapshot with its own data quality and no inferred time zone. Reads share a minimum 15 second interval.",
@@ -133,7 +155,7 @@
         "name": "Communication problem"
       },
       "schedule_on": {
-        "name": "Controller schedule enabled"
+        "name": "Controller schedule flag"
       }
     },
     "switch": {

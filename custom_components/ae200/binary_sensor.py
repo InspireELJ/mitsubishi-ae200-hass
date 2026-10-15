@@ -81,7 +81,7 @@ class AE200CommunicationProblem(AE200Entity, BinarySensorEntity):
 
 
 class AE200ScheduleOn(AE200Entity, BinarySensorEntity):
-    """Controller scheduling enabled, not whether a scheduled action is active."""
+    """Preserve the controller Schedule flag, distinct from ScheduleAvail."""
 
     _attr_translation_key = "schedule_on"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -99,3 +99,20 @@ class AE200ScheduleOn(AE200Entity, BinarySensorEntity):
         if value == "OFF":
             return False
         return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str | bool | None]:
+        dev = self.device
+        raw = dev.raw_attributes() if dev else {}
+        flag = raw.get("Schedule")
+        available = raw.get("ScheduleAvail")
+        # Retain safe raw evidence even during an outage. Typed availability
+        # requires the current group sample, rather than its historical flag.
+        tokens = ("ON", "OFF", "*", "")
+        return {
+            "schedule_available": (
+                available == "ON" if self.available and available in ("ON", "OFF") else None
+            ),
+            "raw_schedule_flag": flag if flag in tokens else None,
+            "raw_schedule_available": available if available in tokens else None,
+        }

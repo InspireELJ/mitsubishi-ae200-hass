@@ -15,7 +15,10 @@ import pytest
 import voluptuous as vol
 
 ROOT = Path(__file__).resolve().parents[1]
-ACTION_NAMES = ("read_member", "read_control_context", "read_today_schedule", "read_controller_clock")
+ACTION_NAMES = (
+    "read_member", "read_control_context", "read_today_schedule", "read_controller_clock",
+    "read_weekly_pattern",
+)
 
 
 @pytest.fixture
@@ -245,6 +248,7 @@ def test_controller_clock_action_fields_have_matching_translations():
     assert set(action["fields"]) == {"config_entry_id"}
     assert all(field["name"] and field["description"] for field in action["fields"].values())
     yaml = (component / "services.yaml").read_text().split("read_controller_clock:\n", 1)[1]
+    yaml = yaml.split("read_weekly_pattern:\n", 1)[0]
     assert "config_entry:" in yaml and "integration: ae200" in yaml
     assert yaml.count("required: true") == 1
     assert "group_id:" not in yaml and "address:" not in yaml

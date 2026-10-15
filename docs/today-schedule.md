@@ -93,7 +93,8 @@ reused as justification for an unbounded history or whole-controller query.
 An empty list means that the controller returned zero records in this
 response. It does not prove that schedules are disabled, unsupported or empty
 in weekly/yearly patterns, and does not replace the separate cached
-schedule-enabled flag.
+schedule flag or its separately reported availability. Neither flag proves
+that a particular plan is active or executing.
 
 ## Cache, failures and evidence
 

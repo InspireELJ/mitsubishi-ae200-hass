@@ -3,6 +3,39 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0b9] - 2026-10-16
+
+### Added
+- Response-only `ae200.read_weekly_pattern` action for one explicitly selected
+  integration entry, configured group, season 1–5 and pattern 1–7. Each call
+  sends one minimal `WPatternList` GET for that exact combination.
+- Independent per-selection diagnostic snapshots, raw plan fields, errors and
+  sample times, with a controller-wide 15-second cooldown from completion.
+- An 18-field record allowlist and a 24-record receive boundary. Oversized
+  responses are rejected in full rather than silently truncated.
+- A separate cached `schedule_available` attribute on the existing schedule
+  diagnostic, based on recognised `ScheduleAvail` values while it is available.
+  Safe raw flag attributes retain limited historical evidence without I/O.
+
+### Fixed
+- Rename the existing schedule diagnostic to *Controller schedule flag* so
+  `Schedule` is no longer presented as a verified enabled-state signal. Keep
+  its identifier, state source, creation rule and default-disabled status.
+  Unknown or unavailable availability data remains unknown.
+
+### Validation scope
+- One minimal live websocket GET for one group/season/pattern combination
+  returned zero records and passed strict parsing without issues. HA action
+  deployment acceptance remains pending; non-empty actions, activation and
+  execution have not passed live acceptance.
+- The receive cap is a local protection based on the official editor; it is
+  not a server-capacity or pagination guarantee. Zero returned records do not
+  prove that scheduling is disabled, unsupported or inactive today.
+- No startup query, periodic poll, automatic 35-combination scan, new entity,
+  schedule write, pattern activation, clock query or automation change is
+  introduced. Clock, TodayList and weekly-pattern reads are separate samples
+  and do not bind a plan to a verified calendar date.
+
 ## [0.2.0b8] - 2026-10-16
 
 ### Added
@@ -15,7 +48,9 @@ All notable changes to this project are documented here. The format is based on
 
 ### Validation scope
 - One minimal live Clock GET returned all six fields and passed strict parsing
-  without issues. HA action deployment acceptance remains pending. Clock values
+  without issues. HA deployment acceptance also confirmed a fresh successful
+  action response matching cached diagnostics, with existing identifiers and
+  automations preserved. Clock values
   do not establish a UTC offset, daylight-saving rules, clock drift or a verified
   time synchronisation source.
 - No setup read, periodic clock poll, entity, clock write or time synchronisation
