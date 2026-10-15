@@ -30,6 +30,20 @@
     }
   },
   "services": {
+    "read_today_schedule": {
+      "name": "Read today's schedule",
+      "description": "Read today's controller schedule for one configured group on demand. Returns a snapshot, including an empty schedule, without predicting the next execution. Reads share a minimum 15 second interval.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Controller",
+          "description": "The AE-200 configuration entry to read from. Select it explicitly even when only one controller is configured."
+        },
+        "group_id": {
+          "name": "Group number",
+          "description": "One configured group number from 1 to 50 on the selected controller."
+        }
+      }
+    },
     "read_control_context": {
       "name": "Read control context",
       "description": "Read the controller and selected group's stop context on demand without changing settings. Each part reports its own data quality. Reads share a minimum 15 second interval.",

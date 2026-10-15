@@ -11,7 +11,7 @@ from typing import Any
 
 import aiohttp
 
-from . import capabilities, const, control_context, metadata, protocol, topology
+from . import capabilities, const, control_context, metadata, protocol, today_schedule, topology
 from .device import MelansDevice
 from .exceptions import MelansCommandUncertainError, MelansConnectionError, MelansError
 from .transport import HttpTransport, WebsocketTransport
@@ -54,6 +54,10 @@ class MelansClient:
         self._control_global: dict[str, Any] = {}
         self._control_groups: dict[str, dict[str, Any]] = {}
         self._control_read_status: dict[str, str] = {}
+        self._today_schedule_lock = asyncio.Lock()
+        self._last_today_schedule_request: float | None = None
+        self._today_schedules: dict[str, dict[str, Any]] = {}
+        self._today_read_status: dict[str, str] = {}
         self.topology: topology.MembershipSnapshot | None = None
         self.topology_last_attempt: datetime | None = None
         self.topology_last_success: datetime | None = None
@@ -319,6 +323,65 @@ class MelansClient:
             "global": global_record, "group": group_record,
             "control_inhibited": True if any(flag is True for flag in flags)
             else False if all(flag is False for flag in flags) else None,
+        }
+
+    async def async_read_today_schedule(self, group_id: str | int) -> dict[str, Any]:
+        """Read one configured group's plan once, never alter or execute it."""
+        group = topology._identifier(group_id, const.MAX_GROUPS)
+        if group not in self._names:
+            raise ValueError("group_id is outside the configured group allowlist")
+        async with self._today_schedule_lock:
+            if (
+                self._last_today_schedule_request is not None
+                and time.monotonic() - self._last_today_schedule_request < const.MIN_POLL_INTERVAL
+            ):
+                self._today_read_status[group] = "cooldown"
+                return self.today_schedule_snapshot(group)
+            record = self._today_schedules.setdefault(group, {})
+            record["last_attempt"] = datetime.now(UTC)
+            try:
+                response = await self._request(today_schedule.build_today_schedule_request(group))
+                sample = today_schedule.parse_today_schedule(response, expected_group=group)
+            except MelansError as error:
+                record["error"] = self._optional_read_error(error)
+                self._today_read_status[group] = "error"
+            else:
+                record.update(sample=sample, last_success=datetime.now(UTC),
+                              seen=time.monotonic(), error=None)
+                self._today_read_status[group] = "updated"
+            finally:
+                self._last_today_schedule_request = time.monotonic()
+            return self.today_schedule_snapshot(group)
+
+    def today_schedule_snapshot(self, group_id: str | int | None = None) -> dict[str, Any]:
+        """Export cached plan evidence with no date, execution or UTC inference."""
+        if group_id is None:
+            return {group: self.today_schedule_snapshot(group)
+                    for group in sorted(self._today_schedules, key=int)}
+        group = topology._identifier(group_id, const.MAX_GROUPS)
+        record = self._today_schedules.get(group, {})
+        sample = record.get("sample")
+        seen = record.get("seen")
+        fresh = (
+            seen is not None and not record.get("error")
+            and time.monotonic() - seen <= self.stale_after
+        )
+        return {
+            "group_id": group, "read_status": self._today_read_status.get(group, "unknown"),
+            "quality": "fresh" if fresh else "stale" if seen is not None else "unknown",
+            "last_attempt": record["last_attempt"].isoformat() if record.get("last_attempt") else None,
+            "last_successful_read": record["last_success"].isoformat() if record.get("last_success") else None,
+            "error": dict(record["error"]) if record.get("error") else None,
+            "records": [
+                {"index": entry.index, "hour": entry.hour if fresh else None,
+                 "minute": entry.minute if fresh else None,
+                 "raw_attributes": entry.raw_attributes(), "issues": list(entry.issues)}
+                for entry in sample.records
+            ] if sample else [],
+            "issues": [
+                {"kind": issue.kind, "record_index": issue.record_index, "key": issue.key}
+                for issue in sample.issues
+            ] if sample else [],
         }
 
     async def async_load_topology(self) -> None:

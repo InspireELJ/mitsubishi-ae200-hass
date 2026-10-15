@@ -13,6 +13,7 @@ from .const import DOMAIN
 
 SERVICE_READ_MEMBER = "read_member"
 SERVICE_READ_CONTROL_CONTEXT = "read_control_context"
+SERVICE_READ_TODAY_SCHEDULE = "read_today_schedule"
 ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 ATTR_ADDRESS = "address"
 ATTR_GROUP_ID = "group_id"
@@ -56,6 +57,7 @@ READ_CONTROL_CONTEXT_SCHEMA = vol.Schema(
         vol.Required(ATTR_GROUP_ID): _group_id,
     }
 )
+READ_TODAY_SCHEDULE_SCHEMA = READ_CONTROL_CONTEXT_SCHEMA
 
 
 def _entry_coordinator(hass: HomeAssistant, entry_id: str) -> Any:
@@ -113,6 +115,25 @@ def async_setup_services(hass: HomeAssistant) -> None:
         # keeps independent global/group quality so callers can use either part.
         return context
 
+    async def async_read_today_schedule(call: ServiceCall) -> ServiceResponse:
+        coordinator = _entry_coordinator(hass, call.data[ATTR_CONFIG_ENTRY_ID])
+        try:
+            schedule = await coordinator.client.async_read_today_schedule(call.data[ATTR_GROUP_ID])
+        except ValueError as err:
+            raise ServiceValidationError(str(err)) from err
+        except MelansError as err:
+            raise HomeAssistantError("The AE-200 schedule read failed") from err
+        if isinstance(schedule, dict) and schedule.get("read_status") == "cooldown":
+            raise HomeAssistantError(
+                "Today's AE-200 schedule read is cooling down. "
+                "Wait at least 15 seconds before another schedule read"
+            )
+        if not isinstance(schedule, dict) or schedule.get("read_status") not in ("updated", "error"):
+            raise HomeAssistantError("The AE-200 read did not produce today's schedule")
+        # This is a bounded controller snapshot, including a valid empty list.
+        # It does not update entities or infer the next scheduled execution.
+        return schedule
+
     if not hass.services.has_service(DOMAIN, SERVICE_READ_MEMBER):
         hass.services.async_register(
             DOMAIN,
@@ -127,5 +148,13 @@ def async_setup_services(hass: HomeAssistant) -> None:
             SERVICE_READ_CONTROL_CONTEXT,
             async_read_control_context,
             schema=READ_CONTROL_CONTEXT_SCHEMA,
+            supports_response=SupportsResponse.ONLY,
+        )
+    if not hass.services.has_service(DOMAIN, SERVICE_READ_TODAY_SCHEDULE):
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_READ_TODAY_SCHEDULE,
+            async_read_today_schedule,
+            schema=READ_TODAY_SCHEDULE_SCHEMA,
             supports_response=SupportsResponse.ONLY,
         )

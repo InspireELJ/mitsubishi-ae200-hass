@@ -30,3 +30,19 @@ read_control_context:
           max: 50
           step: 1
           mode: box
+read_today_schedule:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: ae200
+    group_id:
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 50
+          step: 1
+          mode: box

@@ -3,6 +3,27 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0b7] - 2026-10-16
+
+### Added
+- Response-only `ae200.read_today_schedule` action for one explicitly selected
+  configuration entry and configured group. One minimal `TodayList` request
+  supplies an independent cached snapshot with a controller-wide 15-second
+  cooldown measured from completion.
+- Strict single-group schedule parsing with an 18-field allowlist, raw action
+  tokens, nullable validated hour/minute values and conflict isolation. Responses
+  exceeding the web editor's 24-record limit are rejected rather than truncated.
+
+### Validation scope
+- A minimal live request confirmed the empty `TodayList` response structure.
+  Non-empty plans and their execution have not passed live acceptance.
+- Offline parsing, cache-isolation and HA action contracts cover unsafe or
+  conflicting records, unknown fields and failures. The receive limit is not
+  a claim about server storage capacity or server-side pagination.
+- An empty result means zero records were returned, not that schedules are
+  disabled or unsupported. This release adds no setup read, periodic schedule
+  poll, next-run calculation, new entity, schedule write or automation change.
+
 ## [0.2.0b6] - 2026-10-16
 
 ### Added

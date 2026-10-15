@@ -150,6 +150,7 @@ def cached_snapshot(client: MelansClient) -> dict[str, Any]:
         "capability_error": client.capability_error,
         "last_command": _redact(client.last_command),
         "control_context": client.control_context_snapshot(),
+        "today_schedules": client.today_schedule_snapshot(),
         "controller_metadata": {
             "attempted": client._metadata_attempted,
             "last_attempt": client.metadata_last_attempt.isoformat() if client.metadata_last_attempt else None,
