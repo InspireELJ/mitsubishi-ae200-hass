@@ -43,4 +43,4 @@ pip install pymelans
 ```
 
 MIT licensed. Part of
-[mitsubishi-ae200-hass](https://github.com/GitDakky/mitsubishi-ae200-hass).
+[mitsubishi-ae200-hass](https://github.com/InspireELJ/mitsubishi-ae200-hass).

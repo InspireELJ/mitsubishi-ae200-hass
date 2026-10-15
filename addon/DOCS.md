@@ -38,4 +38,4 @@ value. This add-on deliberately rate-limits itself.
 
 ## Support
 
-Issues: https://github.com/GitDakky/mitsubishi-ae200-hass/issues
+Issues: https://github.com/InspireELJ/mitsubishi-ae200-hass/issues

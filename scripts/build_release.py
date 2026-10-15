@@ -23,6 +23,7 @@ def main() -> None:
         for relative in [
             "LICENSE",
             "docs/deployment-zh.md",
+            "docs/hacs-deployment-zh.md",
             "docs/no-java-diagnostics.md",
             "tools/ae200_readonly_browser.js",
             "tools/install_ha.sh",

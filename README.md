@@ -2,8 +2,9 @@
 
 ## InspireELJ internal pilot
 
-The `feat/inspire-monitoring-pilot` branch contains the `0.2.0b1` monitoring pilot.
-Start with [deployment and rollback](docs/deployment-zh.md) and
+The `feat/inspire-monitoring-pilot` branch contains the `0.2.0b2` monitoring pilot.
+Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
+[deployment and rollback](docs/deployment-zh.md), and
 [diagnostics without Java](docs/no-java-diagnostics.md).
 
 The pilot keeps the `ae200` domain and existing entity identifiers. It adds
@@ -18,9 +19,8 @@ required before relying on this beta for unattended critical operations.
 
 The underlying protocol source remains in `pymelans/`. Run
 `python scripts/sync_ha_library.py` after changing it; never edit the generated
-`custom_components/ae200/_pymelans/` copy directly. The upstream installation
-instructions below describe the original project; use the pilot deployment
-guide for this branch.
+`custom_components/ae200/_pymelans/` copy directly. This fork directs installation
+and support to InspireELJ. The original licence and authorship are retained.
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -87,7 +87,7 @@ managers who value the watchdog and a dedicated settings page often prefer the
 
 - A Mitsubishi AE-200, AE-50, EW-50, G-50(A) or GB-50(A) controller reachable
   on your LAN, with its web interface enabled.
-- Home Assistant 2024.4 or newer.
+- Home Assistant 2025.12 or newer.
 - For the **add-on**: an MQTT broker (the official *Mosquitto broker* add-on is
   auto-detected).
 
@@ -97,10 +97,13 @@ titled *"MITSUBISHI Air Conditioning Control System"*.
 
 ---
 
-## Install — Custom integration (HACS)
+## Install via HACS
+
+For an existing installation, follow the [company HACS migration guide](docs/hacs-deployment-zh.md).
+After the company release is published, new installations can use these steps:
 
 1. HACS → **Integrations** → ⋮ → **Custom repositories**.
-2. Add `https://github.com/GitDakky/mitsubishi-ae200-hass`, category
+2. Add `https://github.com/InspireELJ/mitsubishi-ae200-hass`, category
    **Integration**.
 3. Install **Mitsubishi AE-200 / EW-50** and restart Home Assistant.
 4. **Settings → Devices & Services → Add Integration → Mitsubishi AE-200**.
@@ -119,7 +122,7 @@ directory and restart.
 ## Install — Add-on
 
 1. **Settings → Add-ons → Add-on Store** → ⋮ → **Repositories**.
-2. Add `https://github.com/GitDakky/mitsubishi-ae200-hass`.
+2. Add `https://github.com/InspireELJ/mitsubishi-ae200-hass`.
 3. Install **Mitsubishi AE-200**.
 4. Open the add-on's **Configuration** tab and set:
 

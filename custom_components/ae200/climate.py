@@ -32,6 +32,8 @@ _HA_TO_MODE = {v: k for k, v in _MODE_TO_HA.items()}
 _FAN_TO_HA = {
     mc.FAN_LOW: "low",
     mc.FAN_MID: "medium",
+    mc.FAN_MID1: "medium_1",
+    mc.FAN_MID2: "medium_2",
     mc.FAN_HIGH: "high",
     mc.FAN_AUTO: "auto",
 }
@@ -66,7 +68,7 @@ class AE200Climate(AE200Entity, ClimateEntity):
         HVACMode.DRY,
         HVACMode.HEAT_COOL,
     ]
-    _attr_fan_modes = ["auto", "low", "medium", "high"]
+    _attr_fan_modes = ["auto", "low", "medium", "medium_1", "medium_2", "high"]
     _enable_turn_on_off_backwards_compatibility = False
 
     def __init__(self, coordinator: AE200Coordinator, group_id: str) -> None:

@@ -11,7 +11,7 @@ rest of the library can deal in plain Python strings rather than magic values.
 
 from __future__ import annotations
 
-VERSION = "0.2.0b1"
+VERSION = "0.2.0b2"
 
 # Transport
 DEFAULT_HTTP_PATH = "/servlet/MIMEReceiveServlet"
@@ -42,13 +42,16 @@ MODE_DRY = "DRY"
 MODE_AUTO = "AUTO"
 ALL_MODES = (MODE_COOL, MODE_HEAT, MODE_FAN, MODE_DRY, MODE_AUTO)
 
-# Fan speeds. Controllers vary in how many steps they expose; we keep the
-# superset and the device advertises which it supports.
+# Fan speeds. This is the known protocol vocabulary, not a per-unit capability
+# table. MID1/MID2 have been observed in controller read responses. Do not infer
+# percentages or a unit's supported settings from this list.
 FAN_LOW = "LOW"
 FAN_MID = "MID"
+FAN_MID1 = "MID1"
+FAN_MID2 = "MID2"
 FAN_HIGH = "HIGH"
 FAN_AUTO = "AUTO"
-ALL_FAN_SPEEDS = (FAN_LOW, FAN_MID, FAN_HIGH, FAN_AUTO)
+ALL_FAN_SPEEDS = (FAN_LOW, FAN_MID, FAN_MID1, FAN_MID2, FAN_HIGH, FAN_AUTO)
 
 # Vane / air direction
 AIR_DIR_VALUES = (

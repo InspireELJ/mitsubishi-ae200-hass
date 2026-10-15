@@ -1,6 +1,6 @@
 # 内部试点版本部署与回退
 
-本分支版本：`0.2.0b1`。适用于 Home Assistant Core 2025.12 及更新版本；首个现场目标使用 Core 2026.10.1。
+本分支版本：`0.2.0b2`。适用于 Home Assistant Core 2025.12 及更新版本；首个现场目标使用 Core 2026.10.1。
 
 这是现场验收前的 beta。已测试协议、失败处理和打包；真实控制器与真实 HA 的端到端验收仍需部署后完成。该版本不新增温控、清洁或定时关机策略。
 
@@ -16,14 +16,18 @@
 - 增加 HA 原生 Download diagnostics；下载只导出上次已采集的缓存，不触发额外请求。
 - 将协议库打包在集成内部，不依赖未发布的 `pymelans` PyPI 包。唯一额外运行依赖保持 `websockets>=12.0`。
 
-## 首次部署：手动替换文件
+## 首次部署
 
-首个 beta 采用手动部署。先保留当前 HACS 仓库绑定，暂停对这个集成的上游自动更新；稳定后再迁移 HACS 的仓库绑定。不要同时加载两个相同 domain 的副本。
+优先使用[公司 HACS 部署与更新流程](hacs-deployment-zh.md)，完成一次下载来源迁移后，通过 HACS 接收版本更新。下方手动文件安装作为备用方式；两种方式都保留现有 HA 业务集成条目。
+
+### 备用：手动替换文件
+
+手动安装期间暂停对这个集成的 HACS 更新，避免文件被其他来源覆盖。
 
 1. 在 HA 做一次正常备份，并导出当前空调实体清单。保留现有一键关闭、清洁保护和强制关闭规则。
 2. 下载这个开发分支的 ZIP：
    `https://github.com/InspireELJ/mitsubishi-ae200-hass/archive/refs/heads/feat/inspire-monitoring-pilot.zip`
-   也可以使用 CI 构建产物中的 `ae200-0.2.0b1.zip`；两者都只安装其中的 `custom_components/ae200`。
+   也可以使用 CI 构建产物中的 `ae200-0.2.0b2.zip`；两者都只安装其中的 `custom_components/ae200`。
 3. 解压到电脑上的一个临时目录。用 Samba、Studio Code Server 或现有文件传输方式，将文件放到 HA 配置目录的临时位置，例如：
 
    ```text
@@ -55,7 +59,7 @@
 ## 部署后的验收
 
 1. 设置 → 设备与服务 → Mitsubishi AE-200 / EW-50：原有控制器条目应直接加载。不要重新添加或删除条目。
-2. 确认版本为 `0.2.0b1`；检查原有 climate 实体名称、数量、房间分配及自动化目标没有变化。
+2. 确认版本为 `0.2.0b2`；检查原有 climate 实体名称、数量、房间分配及自动化目标没有变化。
 3. 控制器设备页应出现 Controller status / Last successful read；分组设备页增加 Communication problem。
 4. 等待至少两个轮询周期。默认 30 秒，可在选项中调整，最小 15 秒。诊断中的 last_successful_read 才表示一次真实成功读取；HA last_updated 不具有相同含义。
 5. 在集成条目的菜单选择 Download diagnostics。文件应包含 `inspire-ae200-ha-diagnostics-v1`，各组的 raw_attributes、quality 和最后成功读取时间。
@@ -91,11 +95,11 @@ PYTHONPATH=pymelans pytest tests/ -q -c /dev/null
 python scripts/build_release.py
 ```
 
-`dist/ae200-0.2.0b1.zip` 及其 SHA-256 文件是构建产物，不提交到源码仓库。HACS 迁移时应先保存当前文件，再仅调整 HACS 中的仓库下载来源；业务集成条目保持不动。本文不让 HACS 和手动安装器同时管理更新。
+`dist/ae200-0.2.0b2.zip` 及其 SHA-256 文件是构建产物，不提交到源码仓库。HACS 迁移时应先保存当前文件，再仅调整 HACS 中的仓库下载来源；业务集成条目保持不动。本文不让 HACS 和手动安装器同时管理更新。
 
 ### 公司 fork 的 HACS 检查
 
-首次推送后的代码测试、打包和 hassfest 已通过；HACS validation 报告仓库没有启用 Issues，也没有 Topics。这是 fork 的仓库元数据设置，需要仓库管理员在 GitHub 中补齐：
+HACS validation 会核查仓库的 Issues 和 Topics。首次推送曾因缺少这两项设置失败；仓库管理员可按下面步骤核对，当前状态以 GitHub 页面及本次 CI 结果为准：
 
 1. Settings → General → Features：启用 Issues。
 2. 仓库首页右侧 About 的齿轮：保留现有 Description，并添加相关 Topics，例如 `home-assistant`、`hacs`、`mitsubishi`、`hvac`。

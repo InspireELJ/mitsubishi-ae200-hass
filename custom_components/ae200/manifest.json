@@ -1,12 +1,12 @@
 {
   "domain": "ae200",
   "name": "Mitsubishi AE-200 / EW-50",
-  "codeowners": ["@GitDakky"],
+  "codeowners": ["@yiweninspire"],
   "config_flow": true,
   "documentation": "https://github.com/InspireELJ/mitsubishi-ae200-hass",
   "integration_type": "hub",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/InspireELJ/mitsubishi-ae200-hass/issues",
   "requirements": ["websockets>=12.0"],
-  "version": "0.2.0b1"
+  "version": "0.2.0b2"
 }

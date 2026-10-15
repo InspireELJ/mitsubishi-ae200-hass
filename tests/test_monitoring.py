@@ -332,7 +332,7 @@ def test_cached_diagnostics_redact_identity_and_preserve_unknown_fields(client):
         "Private fixture room",
         {
             "InletHumidity": "0.0",
-            "FanSpeed": "MID2",
+            "FanSpeed": "FUTURE_SPEED",
             "Password": "fixture-secret",
             "FutureField": "supported-value",
             "LocalIP": "private-controller-address",

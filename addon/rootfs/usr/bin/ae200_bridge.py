@@ -48,7 +48,14 @@ MODE_TO_HA = {
     mc.MODE_AUTO: "heat_cool",
 }
 HA_TO_MODE = {v: k for k, v in MODE_TO_HA.items()}
-FAN_TO_HA = {mc.FAN_LOW: "low", mc.FAN_MID: "medium", mc.FAN_HIGH: "high", mc.FAN_AUTO: "auto"}
+FAN_TO_HA = {
+    mc.FAN_LOW: "low",
+    mc.FAN_MID: "medium",
+    mc.FAN_MID1: "medium_1",
+    mc.FAN_MID2: "medium_2",
+    mc.FAN_HIGH: "high",
+    mc.FAN_AUTO: "auto",
+}
 HA_TO_FAN = {v: k for k, v in FAN_TO_HA.items()}
 
 
@@ -115,7 +122,7 @@ class Bridge:
                 "unique_id": f"{uid}_climate",
                 "device": self._device_block(dev),
                 "modes": ["off", "cool", "heat", "fan_only", "dry", "heat_cool"],
-                "fan_modes": ["auto", "low", "medium", "high"],
+                "fan_modes": ["auto", "low", "medium", "medium_1", "medium_2", "high"],
                 "mode_state_topic": f"{base}/mode",
                 "mode_command_topic": f"{base}/mode/set",
                 "temperature_state_topic": f"{base}/target_temp",

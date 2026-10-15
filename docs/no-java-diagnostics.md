@@ -31,6 +31,24 @@ http://<AE200_IP>/init/en/administrator.html
 
 导出 JSON 包含控制器内网地址和原始运行字段，只在内部交换。若页面自身不可达或 WebSocket 被拒绝，返回错误本身就是诊断依据，不需要先更换 Java 环境。
 
+### 这份探测能覆盖什么
+
+脚本读取分组目录，再为每个已发现的分组读取当前 Mnet 属性。每个分组有独立 sampled_at，因此它是一轮逐组快照，不是所有设备在同一毫秒的同步测量。errors 为空且 configured_groups 与 groups 的集合一致，才能说明这轮已发现分组都完成了读取。
+
+当前请求清单有 46 个字段。字段出现在响应里不等于设备支持该功能：空字符串、0 和固件通用占位值仍需逐项判断。`InletHumidity=0`、空的 OutdoorTemp、AC 分组上的水温 0.0，以及通用的 VentMode 等，不能据此证明有相应传感器或设备。`Schedule` / `ScheduleAvail` 也不是完整排程内容。
+
+该脚本没有获取以下完整资料：
+
+- 分组内的室内机 M-NET 地址、具体型号，以及每台机的模式/风档/风向能力表。
+- 当前控制以外的完整周/年排程、联动规则、控制来源或优先级。
+- 当前故障的详细代码、设备地址、故障与通信历史。
+- 压缩机实际运行、Thermo-ON、运行小时、功率、累计电量或计费数据。
+- 完整固件/扩展控制器清单、许可证和能源计量配置。
+
+新版控制页已能登录后，下一步优先观察原厂页面自己的只读请求：设备/分组信息、Advanced settings、Error List / Error Log、Schedule，以及现场确实存在的 Energy Use Status。在 Chrome/Edge 的 F12 → Network 中清空旧记录，再仅打开这些页面，不保存设置、不发送控制命令。
+
+如果请求在 WS 中，查看 Messages 并保存相应只读请求和响应；普通 HAR 不一定包含 WebSocket 帧。若在 Fetch/XHR 中，保留相关 Request payload 和 Response。排除登录、改密、Cookie、Authorization、token、许可证密钥和写请求，仅通过内部渠道交换选定报文。看到实际读取命令后，再逐项加入采集器和合成测试，不猜测接口。
+
 ## Initial Setting Tool 和默认账号
 
 Initial Setting Tool 是独立的 Windows 工具；浏览器的 Java 插件不是它的必要组成部分。截图中的独立程序与老式网页也应分开排查。

@@ -1,0 +1,69 @@
+name: Publish HACS release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - custom_components/ae200/manifest.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ae200-release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.repository == 'InspireELJ/mitsubishi-ae200-hass' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: verify
+    if: github.repository == 'InspireELJ/mitsubishi-ae200-hass' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ae200-pilot
+          path: dist
+      - name: Validate release versions and prepare notes
+        id: release
+        run: python scripts/prepare_release.py --output "$RUNNER_TEMP/ae200-release"
+      - name: Verify tested archive
+        env:
+          AE200_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          cd dist
+          sha256sum --check "ae200-$AE200_VERSION.zip.sha256"
+      - name: Create version tag without overwriting an existing tag
+        env:
+          AE200_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          git tag "$AE200_TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$AE200_TAG"
+      - name: Publish versioned release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AE200_VERSION: ${{ steps.release.outputs.version }}
+          AE200_TAG: ${{ steps.release.outputs.tag }}
+          AE200_PRERELEASE: ${{ steps.release.outputs.prerelease }}
+        run: |
+          flags=()
+          if [ "$AE200_PRERELEASE" = true ]; then
+            flags+=(--prerelease --latest=false)
+          fi
+          gh release create "$AE200_TAG" \
+            --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "AE-200 $AE200_VERSION" \
+            --notes-file "$RUNNER_TEMP/ae200-release/notes.md" \
+            "${flags[@]}" \
+            "dist/ae200-$AE200_VERSION.zip" \
+            "dist/ae200-$AE200_VERSION.zip.sha256"

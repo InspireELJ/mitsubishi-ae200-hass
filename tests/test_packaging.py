@@ -30,7 +30,8 @@ def test_ha_bundle_imports_without_an_external_pymelans_install():
     sys.modules[spec.name] = module
     try:
         spec.loader.exec_module(module)
-        assert module.__version__ == "0.2.0b1"
+        manifest = json.loads((ROOT / "custom_components/ae200/manifest.json").read_text())
+        assert module.__version__ == manifest["version"]
         assert module.MelansDevice("1", None, {}).is_on is None
     finally:
         for name in list(sys.modules):

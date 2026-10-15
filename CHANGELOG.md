@@ -3,6 +3,26 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0b2] - 2026-10-16
+
+### Added
+- A HACS release workflow restricted to version changes on the company repository's
+  main branch, with CI gates, version validation, release notes, archive checksums
+  and a manual retry entry point.
+- HACS migration, beta update, authentication and rollback instructions.
+
+### Fixed
+- Preserve the distinct MID1/MID2 fan readings as medium_1/medium_2 in HA and MQTT;
+  keep MID/medium compatibility. These are protocol labels, not fan percentages
+  or a per-unit capability discovery result. Live write acceptance remains pending.
+- Direct installation, issue and maintenance links to the company fork; preserve
+  original licence and authorship attribution.
+
+### Validation scope
+- Read-side fan enumeration evidence from a successful controller probe. Added
+  synthetic HA command mapping and release-validation tests. Site acceptance of
+  the installed beta and its control commands remains required.
+
 ## [0.2.0b1] - 2026-10-16
 
 ### Added

@@ -122,6 +122,31 @@ def test_unknown_power_does_not_become_off(ha_modules):
     assert classes.AE200Climate(c, "1").hvac_mode is None
 
 
+@pytest.mark.parametrize("raw,mode", [("MID", "medium"), ("MID1", "medium_1"), ("MID2", "medium_2")])
+def test_fan_steps_keep_distinct_reported_values(ha_modules, raw, mode):
+    classes = importlib.import_module(ha_modules + ".climate")
+    c = coordinator()
+    c.client.devices["1"].update({"FanSpeed": raw})
+    entity = classes.AE200Climate(c, "1")
+    assert entity.fan_mode == mode
+    assert mode in entity._attr_fan_modes
+    assert entity.extra_state_attributes["fan_speed_raw"] == raw
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode,raw", [("medium", "MID"), ("medium_1", "MID1"), ("medium_2", "MID2")])
+async def test_fan_commands_preserve_wire_enumerations(ha_modules, mode, raw):
+    from unittest.mock import AsyncMock
+
+    classes = importlib.import_module(ha_modules + ".climate")
+    c = coordinator()
+    c.client.set_fan_speed = AsyncMock()
+    c.async_request_refresh = AsyncMock()
+    await classes.AE200Climate(c, "1").async_set_fan_mode(mode)
+    c.client.set_fan_speed.assert_awaited_once_with("1", raw)
+    c.async_request_refresh.assert_awaited_once()
+
+
 @pytest.mark.asyncio
 async def test_ha_diagnostics_are_cached_and_do_not_export_host_or_entry_data(ha_modules):
     diagnostics = importlib.import_module(ha_modules + ".diagnostics")
