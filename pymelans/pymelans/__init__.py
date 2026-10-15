@@ -10,6 +10,7 @@ from __future__ import annotations
 from . import const
 from .client import MelansClient
 from .device import MelansDevice
+from .diagnostics import cached_snapshot
 from .exceptions import (
     MelansAuthError,
     MelansConnectionError,
@@ -17,7 +18,7 @@ from .exceptions import (
     MelansProtocolError,
 )
 
-__version__ = "0.1.0"
+__version__ = const.VERSION
 __all__ = [
     "MelansClient",
     "MelansDevice",
@@ -26,4 +27,5 @@ __all__ = [
     "MelansProtocolError",
     "MelansAuthError",
     "const",
+    "cached_snapshot",
 ]

@@ -5,12 +5,12 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from pymelans import MelansClient, MelansDevice, MelansError
-
+from ._pymelans import MelansClient, MelansDevice, MelansError
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
@@ -22,6 +22,7 @@ class AE200Coordinator(DataUpdateCoordinator[dict[str, MelansDevice]]):
     def __init__(
         self,
         hass: HomeAssistant,
+        entry: ConfigEntry,
         *,
         host: str,
         port: int,
@@ -32,6 +33,7 @@ class AE200Coordinator(DataUpdateCoordinator[dict[str, MelansDevice]]):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name=f"{DOMAIN} {host}",
             update_interval=timedelta(seconds=interval),
         )
@@ -41,6 +43,7 @@ class AE200Coordinator(DataUpdateCoordinator[dict[str, MelansDevice]]):
             port=port,
             prefer_websocket=prefer_websocket,
             session=async_get_clientsession(hass),
+            stale_after=max(interval * 3, 90),
         )
         self._discovered = False
 

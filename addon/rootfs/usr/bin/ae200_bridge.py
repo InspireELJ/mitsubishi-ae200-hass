@@ -126,11 +126,17 @@ class Bridge:
                 "min_temp": 16,
                 "max_temp": 30,
                 "temp_step": 0.5,
-                "availability_topic": f"{self._node_id()}/availability",
+                "availability": [
+                    {"topic": f"{self._node_id()}/availability"},
+                    {"topic": f"{base}/availability"},
+                    {"topic": f"{base}/climate/availability"},
+                ],
+                "availability_mode": "all",
             }
             await mqtt.publish(
                 f"{dprefix}/climate/{uid}/config",
-                json.dumps(climate_cfg), retain=True,
+                json.dumps(climate_cfg),
+                retain=True,
             )
 
         # Diagnostic binary sensors: filter + fault
@@ -147,27 +153,47 @@ class Bridge:
                 "payload_on": "ON",
                 "payload_off": "OFF",
                 "entity_category": "diagnostic",
-                "availability_topic": f"{self._node_id()}/availability",
+                "availability": [
+                    {"topic": f"{self._node_id()}/availability"},
+                    {"topic": f"{base}/availability"},
+                    {"topic": f"{base}/{key}/availability"},
+                ],
+                "availability_mode": "all",
             }
             await mqtt.publish(
                 f"{dprefix}/binary_sensor/{uid}_{key}/config",
-                json.dumps(cfg), retain=True,
+                json.dumps(cfg),
+                retain=True,
             )
         self._discovery_sent.add(gid)
 
     # -- state ------------------------------------------------------------
     async def _publish_state(self, mqtt: aiomqtt.Client, dev: MelansDevice) -> None:
         base = self._base_topic(dev.group_id)
-        mode = "off" if not dev.is_on else MODE_TO_HA.get(dev.mode or "", "off")
-        await mqtt.publish(f"{base}/mode", mode)
+        mode = (
+            "off" if dev.is_on is False else MODE_TO_HA.get(dev.mode or "") if dev.is_on else None
+        )
+        await mqtt.publish(
+            f"{base}/climate/availability", "online" if mode is not None else "offline", retain=True
+        )
+        if mode is not None:
+            await mqtt.publish(f"{base}/mode", mode)
         if dev.target_temperature is not None:
             await mqtt.publish(f"{base}/target_temp", f"{dev.target_temperature:g}")
         if dev.current_temperature is not None:
             await mqtt.publish(f"{base}/current_temp", f"{dev.current_temperature:g}")
         if dev.fan_speed:
-            await mqtt.publish(f"{base}/fan", FAN_TO_HA.get(dev.fan_speed, "auto"))
-        await mqtt.publish(f"{base}/filter", "ON" if dev.filter_sign else "OFF")
-        await mqtt.publish(f"{base}/error", "ON" if dev.error_sign else "OFF")
+            fan = FAN_TO_HA.get(dev.fan_speed)
+            if fan is not None:
+                await mqtt.publish(f"{base}/fan", fan)
+        for field, value in (("filter", dev.filter_sign), ("error", dev.error_sign)):
+            await mqtt.publish(
+                f"{base}/{field}/availability",
+                "online" if value is not None else "offline",
+                retain=True,
+            )
+            if value is not None:
+                await mqtt.publish(f"{base}/{field}", "ON" if value else "OFF")
 
     # -- command handling -------------------------------------------------
     async def _handle_command(self, topic: str, payload: str) -> None:
@@ -200,8 +226,10 @@ class Bridge:
     async def run(self) -> None:
         will = aiomqtt.Will(f"{self._node_id()}/availability", "offline", retain=True)
         async with aiomqtt.Client(
-            hostname=self.cfg.mqtt_host, port=self.cfg.mqtt_port,
-            username=self.cfg.mqtt_user, password=self.cfg.mqtt_password,
+            hostname=self.cfg.mqtt_host,
+            port=self.cfg.mqtt_port,
+            username=self.cfg.mqtt_user,
+            password=self.cfg.mqtt_password,
             will=will,
         ) as mqtt:
             await mqtt.publish(f"{self._node_id()}/availability", "online", retain=True)
@@ -224,10 +252,18 @@ class Bridge:
         while not self._stop.is_set():
             try:
                 await self.client.async_update()
+                await mqtt.publish(f"{self._node_id()}/availability", "online", retain=True)
                 for dev in self.client.devices.values():
                     if dev.group_id not in self._discovery_sent:
                         await self._publish_discovery(mqtt, dev)
-                    await self._publish_state(mqtt, dev)
+                    fresh = self.client.is_group_available(dev.group_id)
+                    if fresh:
+                        await self._publish_state(mqtt, dev)
+                    await mqtt.publish(
+                        f"{self._base_topic(dev.group_id)}/availability",
+                        "online" if fresh else "offline",
+                        retain=True,
+                    )
                 LIVENESS_FILE.write_text(str(int(time.time())))
                 backoff = 5
                 await asyncio.sleep(self.cfg.scan_interval)
@@ -235,7 +271,8 @@ class Bridge:
                 raise
             except Exception as err:  # noqa: BLE001 - watchdog: never die on a poll
                 _LOGGER.error("Poll cycle failed (%s); retrying in %ss", err, backoff)
-                await asyncio.sleep(backoff)
+                await mqtt.publish(f"{self._node_id()}/availability", "offline", retain=True)
+                await asyncio.sleep(max(backoff, mc.MIN_POLL_INTERVAL))
                 backoff = min(backoff * 2, 120)
 
     def request_stop(self) -> None:
@@ -250,7 +287,10 @@ async def _amain() -> None:
     )
     _LOGGER.info(
         "AE-200 bridge starting: host=%s port=%s ws=%s interval=%ss",
-        cfg.host, cfg.port, cfg.prefer_ws, cfg.scan_interval,
+        cfg.host,
+        cfg.port,
+        cfg.prefer_ws,
+        cfg.scan_interval,
     )
     bridge = Bridge(cfg)
 

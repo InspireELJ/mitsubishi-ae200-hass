@@ -11,11 +11,10 @@ from homeassistant.components.climate import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from pymelans import const as mc
-
+from ._pymelans import const as mc
 from .const import DOMAIN
 from .coordinator import AE200Coordinator
 from .entity import AE200Entity
@@ -89,11 +88,13 @@ class AE200Climate(AE200Entity, ClimateEntity):
         return self.device.target_temperature if self.device else None
 
     @property
-    def hvac_mode(self) -> HVACMode:
+    def hvac_mode(self) -> HVACMode | None:
         dev = self.device
-        if not dev or not dev.is_on:
+        if not dev or dev.is_on is None:
+            return None
+        if not dev.is_on:
             return HVACMode.OFF
-        return _MODE_TO_HA.get(dev.mode or "", HVACMode.OFF)
+        return _MODE_TO_HA.get(dev.mode or "")
 
     @property
     def fan_mode(self) -> str | None:
@@ -114,6 +115,8 @@ class AE200Climate(AE200Entity, ClimateEntity):
             "error_sign": dev.error_sign,
             "local_remote_prohibited": dev.local_remote_prohibited,
             "transport": self.coordinator.client.transport_name,
+            "data_quality": self.coordinator.client.group_quality(self._group_id),
+            "fan_speed_raw": dev.fan_speed,
         }
 
     async def async_set_temperature(self, **kwargs: Any) -> None:

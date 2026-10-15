@@ -1,5 +1,27 @@
 # Mitsubishi AE-200 / EW-50 for Home Assistant
 
+## InspireELJ internal pilot
+
+The `feat/inspire-monitoring-pilot` branch contains the `0.2.0b1` monitoring pilot.
+Start with [deployment and rollback](docs/deployment-zh.md) and
+[diagnostics without Java](docs/no-java-diagnostics.md).
+
+The pilot keeps the `ae200` domain and existing entity identifiers. It adds
+per-group freshness, controller health, checked command acknowledgements,
+cached raw-field diagnostics and a self-contained HACS bundle. Zero humidity
+is treated as an unverified value rather than a measurement.
+
+This branch requires Home Assistant 2025.12 or later. Protocol tests use
+synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts
+use API boundary stubs. Real HA/controller end-to-end validation is still
+required before relying on this beta for unattended critical operations.
+
+The underlying protocol source remains in `pymelans/`. Run
+`python scripts/sync_ha_library.py` after changing it; never edit the generated
+`custom_components/ae200/_pymelans/` copy directly. The upstream installation
+instructions below describe the original project; use the pilot deployment
+guide for this branch.
+
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 

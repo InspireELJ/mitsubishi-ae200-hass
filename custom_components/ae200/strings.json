@@ -31,17 +31,46 @@
   },
   "entity": {
     "sensor": {
-      "inlet_temp": { "name": "Return air temperature" },
-      "outdoor_temp": { "name": "Outdoor temperature" },
-      "humidity": { "name": "Humidity" },
-      "water_outlet_temp": { "name": "Water outlet temperature" }
+      "inlet_temp": {
+        "name": "Return air temperature"
+      },
+      "outdoor_temp": {
+        "name": "Outdoor temperature"
+      },
+      "humidity": {
+        "name": "Humidity"
+      },
+      "water_outlet_temp": {
+        "name": "Water outlet temperature"
+      },
+      "controller_status": {
+        "name": "Controller status",
+        "state": {
+          "unknown": "Unknown",
+          "online": "Online",
+          "degraded": "Degraded",
+          "offline": "Offline"
+        }
+      },
+      "last_successful_read": {
+        "name": "Last successful read"
+      }
     },
     "binary_sensor": {
-      "filter_sign": { "name": "Filter cleaning required" },
-      "error_sign": { "name": "Fault" }
+      "filter_sign": {
+        "name": "Filter cleaning required"
+      },
+      "error_sign": {
+        "name": "Fault"
+      },
+      "communication_problem": {
+        "name": "Communication problem"
+      }
     },
     "switch": {
-      "remote_lock": { "name": "Local remote lockout" }
+      "remote_lock": {
+        "name": "Local remote lockout"
+      }
     }
   }
 }

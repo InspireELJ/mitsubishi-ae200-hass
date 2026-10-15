@@ -11,6 +11,8 @@ rest of the library can deal in plain Python strings rather than magic values.
 
 from __future__ import annotations
 
+VERSION = "0.2.0b1"
+
 # Transport
 DEFAULT_HTTP_PATH = "/servlet/MIMEReceiveServlet"
 DEFAULT_WS_PATH = "/b_xmlproc/"
@@ -20,11 +22,13 @@ DEFAULT_PORT = 80
 # The controller is sensitive to aggressive polling. CVE-2008-1546 documents a
 # denial-of-service on the same servlet, so we are deliberately a well-behaved
 # client: a floor on poll interval and a minimum spacing between writes.
-MIN_POLL_INTERVAL = 15          # seconds; refuse to poll faster than this
-DEFAULT_POLL_INTERVAL = 30      # seconds
-MIN_WRITE_SPACING = 1.0         # seconds between consecutive setRequests
-REQUEST_TIMEOUT = 8             # seconds per request
-MAX_GROUPS = 50                 # AE-200 + AE-50 expansion tops out well under this
+MIN_POLL_INTERVAL = 15  # seconds; refuse to poll faster than this
+DEFAULT_POLL_INTERVAL = 30  # seconds
+MIN_WRITE_SPACING = 1.0  # seconds between consecutive setRequests
+MIN_REQUEST_SPACING = 1.0  # shared spacing for discovery, reads and writes
+DEFAULT_STALE_AFTER = 90  # seconds since a group's last successful read
+REQUEST_TIMEOUT = 8  # seconds per request
+MAX_GROUPS = 50  # AE-200 + AE-50 expansion tops out well under this
 
 # Drive (power)
 DRIVE_ON = "ON"
@@ -79,8 +83,8 @@ SIGN_OFF = "OFF"
 # or an air-to-water (HWHP) unit all come back through the same Mnet object
 # but populate different attribute sets.
 KIND_AC = "ac"
-KIND_VENTILATION = "ventilation"   # Lossnay / air handler
-KIND_ATW = "atw"                   # air-to-water / hydronic heat pump
+KIND_VENTILATION = "ventilation"  # Lossnay / air handler
+KIND_ATW = "atw"  # air-to-water / hydronic heat pump
 KIND_UNKNOWN = "unknown"
 
 # An InletTemp of roughly -40 means the return-air thermistor is faulted or

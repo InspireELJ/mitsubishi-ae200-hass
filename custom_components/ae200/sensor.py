@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -16,12 +17,11 @@ from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from pymelans import MelansDevice
-from pymelans import const as mc
-
+from ._pymelans import MelansDevice
+from ._pymelans import const as mc
 from .const import DOMAIN
 from .coordinator import AE200Coordinator
-from .entity import AE200Entity
+from .entity import AE200ControllerEntity, AE200Entity
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -57,7 +57,7 @@ SENSORS: tuple[AE200SensorDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: d.current_humidity,
-        exists_fn=lambda d: d.current_humidity is not None,
+        exists_fn=lambda d: d.has_humidity_attribute,
     ),
     AE200SensorDescription(
         key="water_outlet_temp",
@@ -85,6 +85,12 @@ async def async_setup_entry(
         if desc.exists_fn(dev)
     ]
     async_add_entities(entities)
+    async_add_entities(
+        [
+            AE200ControllerStatus(coordinator),
+            AE200LastSuccessfulRead(coordinator),
+        ]
+    )
 
 
 class AE200Sensor(AE200Entity, SensorEntity):
@@ -104,3 +110,39 @@ class AE200Sensor(AE200Entity, SensorEntity):
     def native_value(self) -> float | None:
         dev = self.device
         return self.entity_description.value_fn(dev) if dev else None
+
+
+class AE200ControllerStatus(AE200ControllerEntity, SensorEntity):
+    _attr_translation_key = "controller_status"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["unknown", "online", "degraded", "offline"]
+
+    def __init__(self, coordinator: AE200Coordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.host}_controller_status"
+
+    @property
+    def native_value(self) -> str:
+        return self.coordinator.client.health
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            "transport": self.coordinator.client.transport_name,
+            "failed_groups": sorted(self.coordinator.client.failed_groups, key=int),
+        }
+
+
+class AE200LastSuccessfulRead(AE200ControllerEntity, SensorEntity):
+    _attr_translation_key = "last_successful_read"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, coordinator: AE200Coordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.host}_last_successful_read"
+
+    @property
+    def native_value(self) -> datetime | None:
+        return self.coordinator.client.last_success
