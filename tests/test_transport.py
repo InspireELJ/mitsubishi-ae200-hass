@@ -4,21 +4,162 @@ from __future__ import annotations
 
 import asyncio
 import time
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import aiohttp
 import pytest
+import websockets
 from aiohttp import web
-from pymelans.exceptions import MelansConnectionError, MelansProtocolError
+from pymelans.exceptions import (
+    MelansCommandUncertainError,
+    MelansConnectionError,
+    MelansError,
+    MelansProtocolError,
+)
 from pymelans.protocol import build_set_request, build_state_request
 from pymelans.transport import HttpTransport, WebsocketTransport
 from websockets.asyncio.server import serve
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import ConnectionClosed, ConnectionClosedError, ConnectionClosedOK
+from websockets.frames import Close
 
-from pymelans import MelansClient
+from pymelans import MelansClient, const
 
 RESPONSE = '<Packet><Command>getResponse</Command><DatabaseManager><Mnet Group="1" Drive="OFF" /></DatabaseManager></Packet>'
 NOTIFICATION = '<Packet><Command>notifyRequest</Command><DatabaseManager><Mnet Address="1" FanStatus="ON" /></DatabaseManager></Packet>'
+ACKNOWLEDGEMENT = '<Packet><Command>setResponse</Command><DatabaseManager /></Packet>'
+
+
+@pytest.fixture
+def memory_socket(monkeypatch):
+    """Install an in-memory websocket so write-boundary tests use no network."""
+    monkeypatch.setattr(const, "MIN_REQUEST_SPACING", 0)
+
+    def install(*, open_error=None, send_error=None, receive_error=None, response=RESPONSE):
+        socket = SimpleNamespace(
+            send=AsyncMock(side_effect=send_error),
+            recv=AsyncMock(side_effect=receive_error, return_value=response),
+        )
+
+        class Connection:
+            async def __aenter__(self):
+                if open_error is not None:
+                    raise open_error
+                return socket
+
+            async def __aexit__(self, *_args):
+                return False
+
+        monkeypatch.setattr(websockets, "connect", lambda *_args, **_kwargs: Connection())
+        return socket
+
+    return install
+
+
+def test_uncertain_command_is_not_a_retryable_connection_error():
+    assert issubclass(MelansCommandUncertainError, MelansError)
+    assert not issubclass(MelansCommandUncertainError, MelansConnectionError)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [
+    TimeoutError("response deadline"),
+    OSError("connection lost"),
+    ConnectionClosedOK(Close(1000, ""), Close(1000, ""), True),
+    ConnectionClosedOK(Close(1001, ""), Close(1001, ""), True),
+    ConnectionClosedError(None, None, None),
+])
+async def test_memory_write_after_send_is_uncertain_and_never_falls_back(memory_socket, error):
+    socket = memory_socket(receive_error=error)
+    async with MelansClient("fixture.invalid") as client:
+        client._http.request = AsyncMock(return_value=ACKNOWLEDGEMENT)
+        payload = build_set_request(1, {"Drive": "OFF"})
+        with pytest.raises(MelansCommandUncertainError):
+            await client._request(payload)
+        socket.send.assert_awaited_once_with(payload)
+        client._http.request.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_memory_write_marks_send_attempt_before_a_failed_send(memory_socket):
+    socket = memory_socket(send_error=OSError("send may have partially completed"))
+    async with MelansClient("fixture.invalid") as client:
+        client._http.request = AsyncMock(return_value=ACKNOWLEDGEMENT)
+        payload = build_set_request(1, {"Mode": "FAN", "Drive": "ON"})
+        with pytest.raises(MelansCommandUncertainError):
+            await client._request(payload)
+        socket.send.assert_awaited_once_with(payload)
+        socket.recv.assert_not_awaited()
+        client._http.request.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [OSError("connect refused"), TimeoutError("handshake timeout")])
+async def test_memory_write_before_send_preserves_http_compatibility(memory_socket, error):
+    socket = memory_socket(open_error=error)
+    async with MelansClient("fixture.invalid") as client:
+        client._http.request = AsyncMock(return_value=ACKNOWLEDGEMENT)
+        payload = build_set_request(1, {"Drive": "OFF"})
+        assert await client._request(payload) == ACKNOWLEDGEMENT
+        socket.send.assert_not_awaited()
+        client._http.request.assert_awaited_once_with(payload)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [
+    TimeoutError("response deadline"), OSError("connection lost"),
+    ConnectionClosedOK(Close(1000, ""), Close(1000, ""), True),
+    ConnectionClosedError(None, None, None),
+])
+async def test_memory_read_after_send_still_falls_back_to_http(memory_socket, error):
+    socket = memory_socket(receive_error=error)
+    async with MelansClient("fixture.invalid") as client:
+        client._http.request = AsyncMock(return_value=RESPONSE)
+        payload = build_state_request([1])
+        assert await client._request(payload) == RESPONSE
+        socket.send.assert_awaited_once_with(payload)
+        client._http.request.assert_awaited_once_with(payload)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["open", "send", "receive"])
+async def test_memory_cancellation_is_not_an_uncertain_error_or_a_retry(memory_socket, phase):
+    arguments = {f"{phase}_error": asyncio.CancelledError()}
+    socket = memory_socket(**arguments)
+    async with MelansClient("fixture.invalid") as client:
+        client._http.request = AsyncMock(return_value=ACKNOWLEDGEMENT)
+        with pytest.raises(asyncio.CancelledError):
+            await client._request(build_set_request(1, {"Drive": "OFF"}))
+        assert socket.send.await_count == (0 if phase == "open" else 1)
+        client._http.request.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_memory_real_response_deadline_after_send_is_uncertain(memory_socket):
+    socket = memory_socket()
+
+    async def wait_without_response():
+        await asyncio.Event().wait()
+
+    socket.recv.side_effect = wait_without_response
+    async with MelansClient("fixture.invalid") as client:
+        client._ws._timeout = 0.01
+        client._http.request = AsyncMock(return_value=ACKNOWLEDGEMENT)
+        with pytest.raises(MelansCommandUncertainError):
+            await client._request(build_set_request(1, {"Drive": "OFF"}))
+        socket.send.assert_awaited_once()
+        client._http.request.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_memory_acknowledged_write_returns_the_response_without_retry(memory_socket):
+    socket = memory_socket(response=ACKNOWLEDGEMENT)
+    async with MelansClient("fixture.invalid") as client:
+        client._http.request = AsyncMock()
+        payload = build_set_request(1, {"Drive": "OFF"})
+        assert await client._request(payload) == ACKNOWLEDGEMENT
+        socket.send.assert_awaited_once_with(payload)
+        client._http.request.assert_not_awaited()
 
 
 @pytest.mark.asyncio

@@ -24,7 +24,7 @@ promise of support:
 
 Implementation status has a separate meaning:
 
-- **Implemented**: present in the `0.2.0b3` source. Individual device support
+- **Implemented**: present in the `0.2.0b5` source. Individual device support
   and end-to-end acceptance still apply. This is not a claim that every row has
   passed a live control test or that an installation has loaded this version.
 - **Shared library only**: protocol support exists without a complete native HA
@@ -32,7 +32,27 @@ Implementation status has a separate meaning:
 - **Planned**: a candidate requiring implementation, additional protocol
   evidence or a suitable device. It is not currently a supported HA feature.
 
-## Scope of 0.2.0b4
+## Scope of 0.2.0b5
+
+The native integration attempts a minimal `SystemData` read and a separate
+`FunctionControl/FunctionList` read once at setup or reload. Cached diagnostics
+retain only the controller's display model and version strings, and function
+index, raw status, raw time-limit token and a limited active-state interpretation.
+The reads have independent errors, reuse the existing request pacing and add
+no periodic metadata poll. See [controller metadata](controller-metadata.md).
+
+Live reads confirmed the expected structures, without establishing that any
+licensed XML endpoint or equipment feature works. An active licence is not a
+hardware capability, a valid measurement or proof of endpoint availability.
+No keys, activation, fault-history scan or new licensed control is implemented.
+
+If a websocket write loses its connection or response after sending starts,
+the result is `outcome_unknown` and the write is not replayed over HTTP. A later
+bounded state read can show what the controller currently reports, but does
+not supply the missing acknowledgement. This condition remains distinct from
+an acknowledged command awaiting confirmation or an explicit rejection.
+
+## Membership scope introduced in 0.2.0b4
 
 The native integration now reads configured membership once after the first
 successful group refresh. Its on-demand `ae200.read_member` action reads one
@@ -104,6 +124,8 @@ behaviour and diagnostic entities described here apply to HACS.
 | Filter and fault signs | Implemented | Live flag values and existing problem sensors. | Retain unknown for unrecognised values; do not clear service signs as part of discovery. |
 | Controller health and per-group freshness | Implemented | Cached success times, failed groups and offline failure tests. | Confirm fresh, degraded and offline behaviour without presenting old samples as new observations. |
 | Cached diagnostics and command confirmation | Implemented; capability details and optional command-status entity added in 0.2.0b3 | Cached exporter and checked write acknowledgement/readback implementation. | Keep diagnostics free of additional controller requests and distinguish acceptance from confirmed state. The new status sensor is disabled by default. |
+| Controller display model and versions | Cached read-only diagnostics in 0.2.0b5 | Official `SystemData` builder and live minimal response structure. | Preserve raw version strings and unknown fields; exclude serial numbers and network settings. This is a setup snapshot, not a periodic firmware monitor. |
+| Licence-status summary | Cached read-only diagnostics in 0.2.0b5 | Official `FunctionList` model and live directory response. | Verify each desired endpoint and connected hardware independently. Active licence status alone proves neither capability nor usable data; raw time limits are not computed expiry dates. |
 | General local remote lock | Implemented legacy switch | Existing `RemoCon` setter and state parser. | This switch is retained for compatibility and is not yet gated by the newly read prohibition capability flags. Verify applicability before using it on another device family. |
 | Per-function local remote prohibitions | Planned | Official client separates drive, mode, temperature, filter reset, vane, fan and timer prohibition items. | Confirm the desired scope and each write/readback. These flags restrict local controls; they are not hardware capability flags. |
 | Group members, M-NET addresses and equipment family | Implemented as cached read-only diagnostics in 0.2.0b4 | Official `MnetGroupList` model and live configured membership. | Broaden representative multi-member hardware acceptance before creating additional devices or changing entity relationships. |
@@ -209,9 +231,11 @@ hardware functions solely because local controls are prohibited.
 2. Add read-only group membership and address-level status. Use this to develop
    fault detail and actual operating-state entities with explicit unknown
    handling. Define aggregation where several indoor units share one group.
-3. Add read-only controller identity, licence summaries, schedule inspection and
-   bounded fault history. Refresh static metadata separately from operational
-   state, and load historical data on demand or at a suitable slower interval.
+3. Accept the controller identity and licence summaries added in `0.2.0b5`, then
+   develop schedule inspection and bounded fault history. Refresh static
+   metadata separately from operational state. A server-side history bound
+   must be established before introducing a history request; local truncation
+   alone does not bound controller work.
 4. Implement runtime and energy only after confirming valid data and its
    semantics. Decide whether data belongs in a current sensor, a diagnostic
    export or a historical import rather than pushing every trend into a

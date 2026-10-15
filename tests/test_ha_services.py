@@ -66,6 +66,11 @@ def ha_service_modules(monkeypatch):
             self.client = types.SimpleNamespace(
                 async_read_member=AsyncMock(),
                 async_load_topology=AsyncMock(side_effect=lambda: events.append("topology")),
+                async_load_controller_metadata=AsyncMock(
+                    side_effect=lambda: events.append("metadata")
+                ),
+                async_load_function_list=AsyncMock(side_effect=lambda: events.append("functions")),
+                controller_metadata=None,
                 close=AsyncMock(),
             )
             self.async_config_entry_first_refresh = AsyncMock(
@@ -75,7 +80,9 @@ def ha_service_modules(monkeypatch):
             coordinators.append(self)
 
     entries = {}
-    device_registry = types.SimpleNamespace(async_get_or_create=Mock())
+    device_registry = types.SimpleNamespace(
+        async_get_device=Mock(return_value=None), async_get_or_create=Mock()
+    )
     hass = types.SimpleNamespace(
         data={},
         services=Registry(),
@@ -109,6 +116,7 @@ def ha_service_modules(monkeypatch):
     yield types.SimpleNamespace(
         hass=hass, entries=entries, integration=integration, services=services,
         coordinators=coordinators, Coordinator=Coordinator, events=events,
+        device_registry=device_registry,
         HomeAssistantError=HomeAssistantError, ServiceValidationError=ServiceValidationError,
         SupportsResponse=SupportsResponse,
     )
@@ -270,8 +278,10 @@ async def test_setup_loads_topology_after_first_refresh_without_reading_members(
     assert await c.integration.async_setup_entry(c.hass, selected)
     coordinator = c.coordinators[0]
 
-    assert c.events == ["refresh", "topology", "platforms"]
+    assert c.events == ["refresh", "topology", "metadata", "functions", "platforms"]
     coordinator.client.async_load_topology.assert_awaited_once()
+    coordinator.client.async_load_controller_metadata.assert_awaited_once()
+    coordinator.client.async_load_function_list.assert_awaited_once()
     coordinator.client.async_read_member.assert_not_awaited()
     assert c.hass.data["ae200"][selected.entry_id] is coordinator
     assert selected.data == {"host": "fixture.invalid"}
@@ -291,10 +301,104 @@ async def test_failed_first_refresh_never_loads_topology_or_platforms(
         await c.integration.async_setup_entry(c.hass, selected)
 
     coordinator.client.async_load_topology.assert_not_awaited()
+    coordinator.client.async_load_controller_metadata.assert_not_awaited()
+    coordinator.client.async_load_function_list.assert_not_awaited()
     coordinator.client.async_read_member.assert_not_awaited()
     coordinator.client.close.assert_awaited_once()
     c.hass.config_entries.async_forward_entry_setups.assert_not_awaited()
     assert not c.hass.data
+
+
+@pytest.mark.asyncio
+async def test_first_setup_uses_generic_model_without_inventing_versions(ha_service_modules):
+    c = ha_service_modules
+    selected = entry()
+
+    assert await c.integration.async_setup_entry(c.hass, selected)
+
+    c.device_registry.async_get_device.assert_called_once_with(
+        identifiers={("ae200", "fixture.invalid")}
+    )
+    registered = c.device_registry.async_get_or_create.call_args.kwargs
+    assert registered["identifiers"] == {("ae200", "fixture.invalid")}
+    assert registered["model"] == "AE-200 / AE-50 / EW-50"
+    assert "sw_version" not in registered and "hw_version" not in registered
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("existing", [None, types.SimpleNamespace(model="Generic model")])
+async def test_cached_controller_metadata_updates_only_existing_registry_fields(
+    ha_service_modules, monkeypatch, existing
+):
+    c = ha_service_modules
+    selected = entry()
+    coordinator = c.Coordinator(c.hass, selected, host="fixture.invalid")
+    coordinator.client.controller_metadata = types.SimpleNamespace(
+        model="AE-200E", version="8.01", version_if="1.07"
+    )
+    c.device_registry.async_get_device.return_value = existing
+    monkeypatch.setattr(c.integration, "AE200Coordinator", lambda *_args, **_kw: coordinator)
+
+    assert await c.integration.async_setup_entry(c.hass, selected)
+
+    registered = c.device_registry.async_get_or_create.call_args.kwargs
+    assert registered == {
+        "config_entry_id": selected.entry_id,
+        "identifiers": {("ae200", "fixture.invalid")},
+        "name": "Mitsubishi centralised controller",
+        "manufacturer": "Mitsubishi Electric",
+        "model": "AE-200E", "sw_version": "8.01",
+    }
+    assert "hw_version" not in registered
+    c.hass.config_entries.async_forward_entry_setups.assert_awaited_once_with(
+        selected, c.integration.PLATFORMS
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "metadata",
+    [None, types.SimpleNamespace(model=None, version=None, version_if="1.07")],
+)
+async def test_optional_metadata_failure_preserves_existing_model_and_version(
+    ha_service_modules, monkeypatch, metadata
+):
+    c = ha_service_modules
+    selected = entry()
+    coordinator = c.Coordinator(c.hass, selected, host="fixture.invalid")
+    coordinator.client.controller_metadata = metadata
+    existing = types.SimpleNamespace(model="AE-200E", sw_version="8.01")
+    c.device_registry.async_get_device.return_value = existing
+    monkeypatch.setattr(c.integration, "AE200Coordinator", lambda *_args, **_kw: coordinator)
+
+    assert await c.integration.async_setup_entry(c.hass, selected)
+
+    registered = c.device_registry.async_get_or_create.call_args.kwargs
+    assert "model" not in registered
+    assert "sw_version" not in registered and "hw_version" not in registered
+    assert (existing.model, existing.sw_version) == ("AE-200E", "8.01")
+    assert c.events == ["refresh", "topology", "metadata", "functions", "platforms"]
+
+
+@pytest.mark.asyncio
+async def test_partial_metadata_preserves_known_model_and_keeps_version_as_text(
+    ha_service_modules, monkeypatch
+):
+    c = ha_service_modules
+    selected = entry()
+    coordinator = c.Coordinator(c.hass, selected, host="fixture.invalid")
+    coordinator.client.controller_metadata = types.SimpleNamespace(
+        model=None, version="8.00", version_if="1.07"
+    )
+    c.device_registry.async_get_device.return_value = types.SimpleNamespace(model="AE-200E")
+    monkeypatch.setattr(c.integration, "AE200Coordinator", lambda *_args, **_kw: coordinator)
+
+    assert await c.integration.async_setup_entry(c.hass, selected)
+
+    registered = c.device_registry.async_get_or_create.call_args.kwargs
+    assert "model" not in registered
+    assert registered["sw_version"] == "8.00"
+    assert "hw_version" not in registered
 
 
 @pytest.mark.asyncio

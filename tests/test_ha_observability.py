@@ -87,6 +87,10 @@ def observability_modules(monkeypatch):
 def coordinator():
     client = types.SimpleNamespace(
         last_command=None,
+        controller_metadata=None,
+        health="online",
+        transport_name="websocket",
+        failed_groups=set(),
         poll=AsyncMock(side_effect=AssertionError("Entities must use the cache")),
         _request=AsyncMock(side_effect=AssertionError("Entities must not send requests")),
         is_group_available=lambda _: True,
@@ -101,7 +105,8 @@ def coordinator():
 
 @pytest.mark.parametrize(
     "status",
-    ["unknown", "pending", "accepted_unconfirmed", "not_yet_confirmed", "confirmed", "failed"],
+    ["unknown", "pending", "accepted_unconfirmed", "not_yet_confirmed", "confirmed", "failed",
+     "outcome_unknown"],
 )
 def test_command_status_is_cached_and_available_during_outage(observability_modules, status):
     c = coordinator()
@@ -204,6 +209,68 @@ def test_existing_diagnostic_unique_ids_stay_compatible(observability_modules):
     assert binary.AE200CommunicationProblem(c, "1")._attr_unique_id == "fixture.invalid_1_communication_problem"
 
 
+def test_controller_metadata_is_shown_from_safe_cached_fields_only(observability_modules):
+    c = coordinator()
+    c.client.controller_metadata = types.SimpleNamespace(
+        model="AE-200E", version="8.01", version_if="1.07",
+        host="private.invalid", license="private-licence", serial="private-serial",
+    )
+    entity = observability_modules.sensor.AE200ControllerStatus(c)
+
+    assert entity.extra_state_attributes == {
+        "transport": "websocket", "failed_groups": [],
+        "model": "AE-200E", "version": "8.01", "version_if": "1.07",
+    }
+    assert entity.device_info["identifiers"] == {("ae200", "fixture.invalid")}
+    assert entity._attr_unique_id == "fixture.invalid_controller_status"
+    c.client.poll.assert_not_called()
+    c.client._request.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "metadata,expected",
+    [
+        (None, {}),
+        (types.SimpleNamespace(model=None, version=None, version_if=None), {}),
+        (types.SimpleNamespace(model=None, version="8.00", version_if="1.00"),
+         {"version": "8.00", "version_if": "1.00"}),
+    ],
+)
+def test_missing_or_partial_controller_metadata_does_not_invent_values(
+    observability_modules, metadata, expected
+):
+    c = coordinator()
+    c.client.controller_metadata = metadata
+    c.last_update_success = False
+    entity = observability_modules.sensor.AE200ControllerStatus(c)
+
+    assert entity.extra_state_attributes == {
+        "transport": "websocket", "failed_groups": [], **expected
+    }
+    assert entity.available
+    c.client.poll.assert_not_called()
+    c.client._request.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_controller_metadata_does_not_create_additional_entities(observability_modules):
+    c = coordinator()
+    entry = types.SimpleNamespace(entry_id="fixture")
+    hass = types.SimpleNamespace(data={"ae200": {"fixture": c}})
+    before = []
+    await observability_modules.sensor.async_setup_entry(hass, entry, before.extend)
+    c.client.controller_metadata = types.SimpleNamespace(
+        model="AE-200E", version="8.01", version_if="1.07"
+    )
+    after = []
+    await observability_modules.sensor.async_setup_entry(hass, entry, after.extend)
+
+    assert [e._attr_unique_id for e in before] == [e._attr_unique_id for e in after]
+    assert len(before) == 3
+    c.client.poll.assert_not_called()
+    c.client._request.assert_not_called()
+
+
 def test_observability_translations_are_synchronised():
     component = Path(__file__).resolve().parents[1] / "custom_components/ae200"
     source = json.loads((component / "strings.json").read_text(encoding="utf-8"))
@@ -211,5 +278,6 @@ def test_observability_translations_are_synchronised():
     assert source == english
     assert source["entity"]["binary_sensor"]["schedule_on"]["name"] == "Controller schedule enabled"
     assert set(source["entity"]["sensor"]["last_command_status"]["state"]) == {
-        "unknown", "pending", "accepted_unconfirmed", "not_yet_confirmed", "confirmed", "failed"
+        "unknown", "pending", "accepted_unconfirmed", "not_yet_confirmed", "confirmed", "failed",
+        "outcome_unknown"
     }

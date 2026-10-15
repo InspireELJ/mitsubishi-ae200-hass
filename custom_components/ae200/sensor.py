@@ -130,10 +130,24 @@ class AE200ControllerStatus(AE200ControllerEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
-        return {
+        attributes = {
             "transport": self.coordinator.client.transport_name,
             "failed_groups": sorted(self.coordinator.client.failed_groups, key=int),
         }
+        metadata = self.coordinator.client.controller_metadata
+        if metadata is not None:
+            attributes.update(
+                {
+                    key: value
+                    for key, value in (
+                        ("model", metadata.model),
+                        ("version", metadata.version),
+                        ("version_if", metadata.version_if),
+                    )
+                    if value
+                }
+            )
+        return attributes
 
 
 class AE200LastSuccessfulRead(AE200ControllerEntity, SensorEntity):
@@ -164,6 +178,7 @@ class AE200LastCommandStatus(AE200ControllerEntity, SensorEntity):
         "not_yet_confirmed",
         "confirmed",
         "failed",
+        "outcome_unknown",
     ]
 
     def __init__(self, coordinator: AE200Coordinator) -> None:

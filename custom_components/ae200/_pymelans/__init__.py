@@ -13,6 +13,7 @@ from .device import MelansDevice
 from .diagnostics import cached_snapshot
 from .exceptions import (
     MelansAuthError,
+    MelansCommandUncertainError,
     MelansConnectionError,
     MelansError,
     MelansProtocolError,
@@ -23,6 +24,7 @@ __all__ = [
     "MelansClient",
     "MelansDevice",
     "MelansError",
+    "MelansCommandUncertainError",
     "MelansConnectionError",
     "MelansProtocolError",
     "MelansAuthError",
