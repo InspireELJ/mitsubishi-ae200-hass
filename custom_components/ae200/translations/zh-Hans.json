@@ -1,0 +1,88 @@
+{
+  "entity": {
+    "climate": {
+      "air_conditioner": {
+        "state_attributes": {
+          "fan_mode": {
+            "state": {
+              "auto": "自动",
+              "low": "低速",
+              "medium": "中速",
+              "medium_1": "中高速",
+              "medium_2": "中低速",
+              "high": "高速"
+            }
+          },
+          "swing_mode": {
+            "state": {
+              "fixed_horizontal": "固定：水平",
+              "mid_0": "固定：上部中间",
+              "mid_1": "固定：中间",
+              "mid_2": "固定：下部中间",
+              "fixed_vertical": "固定：垂直",
+              "auto": "自动",
+              "swing": "摆风"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "inlet_temp": {
+        "name": "回风温度"
+      },
+      "outdoor_temp": {
+        "name": "室外温度"
+      },
+      "humidity": {
+        "name": "湿度"
+      },
+      "water_outlet_temp": {
+        "name": "出水温度"
+      },
+      "controller_status": {
+        "name": "控制器状态",
+        "state": {
+          "unknown": "未知",
+          "online": "在线",
+          "degraded": "部分异常",
+          "offline": "离线"
+        }
+      },
+      "last_successful_read": {
+        "name": "最近成功读取"
+      },
+      "last_command_status": {
+        "name": "最近控制结果",
+        "state": {
+          "unknown": "未知",
+          "pending": "等待处理",
+          "accepted_unconfirmed": "已接受，等待读回",
+          "not_yet_confirmed": "读回尚未匹配",
+          "confirmed": "已由读回确认",
+          "failed": "失败",
+          "outcome_unknown": "结果未知"
+        }
+      }
+    },
+    "binary_sensor": {
+      "filter_sign": {
+        "name": "滤网需要清洁"
+      },
+      "error_sign": {
+        "name": "故障"
+      },
+      "communication_problem": {
+        "name": "通信异常"
+      },
+      "schedule_on": {
+        "name": "控制器排程标志"
+      }
+    },
+    "switch": {
+      "remote_lock": {
+        "name": "本地遥控器锁定"
+      }
+    }
+  }
+}

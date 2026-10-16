@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -36,13 +38,24 @@ class AE200Entity(CoordinatorEntity[AE200Coordinator]):
         dev = self.device
         name = dev.name if dev else f"Group {self._group_id}"
         kind = dev.kind if dev else "unit"
-        return DeviceInfo(
+        device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{self.coordinator.host}:{self._group_id}")},
             name=name,
             manufacturer=MANUFACTURER,
             model=f"AE-200 {kind} (group {self._group_id})",
-            via_device=(DOMAIN, self.coordinator.host),
         )
+        if "via_device_id" in getattr(DeviceInfo, "__annotations__", {}):
+            controller_device_id = self.coordinator.controller_device_id
+            if controller_device_id is None:
+                raise RuntimeError("Controller device must be registered before group entities")
+            device_info["via_device_id"] = controller_device_id
+        else:
+            # The legacy tuple is required by Home Assistant 2025.12;
+            # newer DeviceInfo types accept only the registry's device id.
+            device_info = cast(DeviceInfo, {
+                **device_info, "via_device": (DOMAIN, self.coordinator.host),
+            })
+        return device_info
 
 
 class AE200ControllerEntity(CoordinatorEntity[AE200Coordinator]):

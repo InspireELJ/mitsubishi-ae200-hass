@@ -3,6 +3,42 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1b8] - 2026-10-16
+
+### Fixed
+- Preserve the controller and group device hierarchy across the supported Home
+  Assistant registry APIs. Prefer the config-entry-scoped parent lookup and
+  returned parent ID when supported; retain the legacy identifier tuple for
+  older DeviceInfo schemas. Existing device identifiers, unique IDs, entity
+  associations and user customisations are preserved.
+- Expose the existing conservative cached humidity value through the climate
+  entity's native `current_humidity` attribute, without adding target-humidity
+  control or changing parsing and units.
+- Register a humidity sensor if its field first appears after setup, using
+  existing cached updates and the original unique ID. Passive discovery avoids
+  duplicate entities, cleans up on unload and does not create coordinator
+  polling demand, change poll scheduling or request another read.
+
+### Presentation
+- Add native English and Simplified Chinese fan and air-direction option
+  labels, Simplified Chinese labels for existing entities, and native option
+  icons. Stored option values and automation parameters remain unchanged;
+  Home Assistant and its frontend determine the final layout and rendering.
+
+### Validation scope
+- Offline full suite: 3530 Python tests passed with two Windows skips; four
+  Node tests, Ruff, 112 in-memory Python compilations and bundled-library
+  equality passed. Independent review found no blocking issue. Registry and
+  coordinator compatibility use the official fixed Home Assistant Core
+  `2025.12.0` and `2026.10.1` API shapes and offline boundary tests.
+- The site's existing 18 humidity entities already report unknown for zero
+  and blank placeholders. Late-field registration does not explain those
+  missing measurements. Zero or unknown does not prove the absence of physical
+  sensors; positive on-site humidity, units and hardware have not been newly
+  verified. No new collector, poll or protocol control is introduced.
+- Timer remains design-only, with no timer action, entity or automatic control.
+  HACS installation and live acceptance for this version remain pending.
+
 ## [0.2.1b7] - 2026-10-16
 
 ### Fixed

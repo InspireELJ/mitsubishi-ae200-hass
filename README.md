@@ -2,7 +2,9 @@
 
 ## InspireELJ internal pilot
 
-This source targets the `0.2.1b7` optional-read cancellation and diagnostic fixes.
+This source targets `0.2.1b8`: Home Assistant registry compatibility, native
+climate presentation and passive discovery of late humidity fields. Release
+installation and live acceptance for this version remain pending.
 For daily controls, action parameters and maintenance, see the
 [Chinese operator guide](docs/operator-guide-zh.md).
 Start with [HACS deployment and updates](docs/hacs-deployment-zh.md),
@@ -183,6 +185,22 @@ Cancellation, malformed-error and mutation-isolation cases remain offline
 evidence; no live outage or fault was injected and the default-disabled
 command sensor was not enabled for testing.
 See [diagnostic state quality](docs/diagnostic-state-quality.md).
+
+Version `0.2.1b8` preserves the parent device hierarchy across legacy and
+current Home Assistant registry APIs, using config-entry-scoped lookup and a
+parent device ID when supported. Existing identifiers, entity associations and
+user customisations remain intact. Native English and Simplified Chinese fan
+and air-direction labels and icons retain the existing stored option values;
+Simplified Chinese labels are also added for existing entities. Climate can
+show a validated cached humidity value, and a humidity field first appearing
+after setup can register its existing sensor through passive notifications.
+This creates no polling demand, additional read or humidity control. The
+existing 18 humidity entities already report unknown for zero or blank
+placeholders; these changes do not manufacture a measurement or prove whether
+physical humidity sensors are installed. Positive on-site humidity and units
+remain unverified. Timer work remains design-only. Offline API boundary tests
+cover the official fixed Core `2025.12.0` and `2026.10.1` interfaces; new-version
+HACS deployment and live acceptance remain pending.
 
 This branch requires Home Assistant 2025.12 or later. Protocol tests use
 synthetic failures and loopback HTTP/WebSocket servers; HA entity contracts

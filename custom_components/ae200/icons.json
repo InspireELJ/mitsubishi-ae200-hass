@@ -1,0 +1,33 @@
+{
+  "entity": {
+    "climate": {
+      "air_conditioner": {
+        "state_attributes": {
+          "fan_mode": {
+            "default": "mdi:fan",
+            "state": {
+              "auto": "mdi:fan-auto",
+              "low": "mdi:fan-speed-1",
+              "medium": "mdi:fan-speed-2",
+              "medium_1": "mdi:fan-speed-2",
+              "medium_2": "mdi:fan-speed-2",
+              "high": "mdi:fan-speed-3"
+            }
+          },
+          "swing_mode": {
+            "default": "mdi:air-conditioner",
+            "state": {
+              "fixed_horizontal": "mdi:arrow-right",
+              "mid_0": "mdi:arrow-bottom-right",
+              "mid_1": "mdi:arrow-bottom-right",
+              "mid_2": "mdi:arrow-bottom-right",
+              "fixed_vertical": "mdi:arrow-down",
+              "auto": "mdi:autorenew",
+              "swing": "mdi:swap-vertical"
+            }
+          }
+        }
+      }
+    }
+  }
+}

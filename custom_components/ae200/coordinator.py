@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -38,6 +39,8 @@ class AE200Coordinator(DataUpdateCoordinator[dict[str, MelansDevice]]):
             update_interval=timedelta(seconds=interval),
         )
         self.host = host
+        self.controller_device_id: str | None = None
+        self._passive_listeners: set[Callable[[], None]] = set()
         self.client = MelansClient(
             host,
             port=port,
@@ -46,6 +49,22 @@ class AE200Coordinator(DataUpdateCoordinator[dict[str, MelansDevice]]):
             stale_after=max(interval * 3, 90),
         )
         self._discovered = False
+
+    @callback
+    def async_add_passive_listener(self, update_callback: Callable[[], None]) -> Callable[[], None]:
+        """Observe cached notifications without creating demand for polling."""
+        self._passive_listeners.add(update_callback)
+        return lambda: self._passive_listeners.discard(update_callback)
+
+    @callback
+    def async_update_listeners(self) -> None:
+        """Notify entities first, then observers which never schedule refreshes."""
+        super().async_update_listeners()
+        for update_callback in tuple(self._passive_listeners):
+            try:
+                update_callback()
+            except Exception:
+                _LOGGER.exception("Unexpected error updating passive AE-200 listener")
 
     async def _async_update_data(self) -> dict[str, MelansDevice]:
         try:
@@ -58,5 +77,6 @@ class AE200Coordinator(DataUpdateCoordinator[dict[str, MelansDevice]]):
             raise UpdateFailed(f"Error communicating with AE-200: {err}") from err
 
     async def async_shutdown(self) -> None:
+        self._passive_listeners.clear()
         await super().async_shutdown()
         await self.client.close()
