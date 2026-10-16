@@ -8,7 +8,7 @@ import sys
 import types
 from dataclasses import dataclass
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -100,6 +100,7 @@ def coordinator():
         client=client,
         data={"1": MelansDevice("1", "Fixture", {"Schedule": "OFF"})},
         last_update_success=True,
+        async_add_passive_listener=Mock(return_value=Mock()),
     )
 
 
@@ -336,7 +337,7 @@ def test_missing_or_partial_controller_metadata_does_not_invent_values(
 @pytest.mark.asyncio
 async def test_controller_metadata_does_not_create_additional_entities(observability_modules):
     c = coordinator()
-    entry = types.SimpleNamespace(entry_id="fixture")
+    entry = types.SimpleNamespace(entry_id="fixture", async_on_unload=Mock())
     hass = types.SimpleNamespace(data={"ae200": {"fixture": c}})
     before = []
     await observability_modules.sensor.async_setup_entry(hass, entry, before.extend)

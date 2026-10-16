@@ -85,6 +85,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: AE200Coordinator = hass.data[DOMAIN][entry.entry_id]
+    humidity_description = next(description for description in SENSORS if description.key == "humidity")
+    humidity_groups = {
+        gid for gid, dev in coordinator.data.items() if humidity_description.exists_fn(dev)
+    }
     entities = [
         AE200Sensor(coordinator, gid, desc)
         for gid, dev in coordinator.data.items()
@@ -99,6 +103,25 @@ async def async_setup_entry(
             AE200LastCommandStatus(coordinator),
         ]
     )
+
+    def async_add_late_humidity_entities() -> None:
+        """Discover late fields from normal cached updates without another read."""
+        if not coordinator.last_update_success:
+            return
+        discovered = [
+            (gid, AE200Sensor(coordinator, gid, humidity_description))
+            for gid, dev in coordinator.data.items()
+            if gid not in humidity_groups
+            and coordinator.client.is_group_available(gid)
+            and humidity_description.exists_fn(dev)
+        ]
+        if discovered:
+            # Mark before enqueueing so another coordinator callback cannot
+            # add the same entity while Home Assistant is still loading it.
+            humidity_groups.update(gid for gid, _ in discovered)
+            async_add_entities([entity for _, entity in discovered])
+
+    entry.async_on_unload(coordinator.async_add_passive_listener(async_add_late_humidity_entities))
 
 
 class AE200Sensor(AE200Entity, SensorEntity):

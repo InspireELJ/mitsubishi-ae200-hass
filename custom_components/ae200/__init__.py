@@ -47,7 +47,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     registry = dr.async_get(hass)
     identifiers = {(DOMAIN, coordinator.host)}
-    existing = registry.async_get_device(identifiers=identifiers)
+    get_by_identifier = getattr(registry, "async_get_device_by_identifier", None)
+    if callable(get_by_identifier):
+        existing = get_by_identifier(
+            identifier=(DOMAIN, coordinator.host), config_entry_id=entry.entry_id
+        )
+    else:
+        # Home Assistant 2025.12 has only the global identifier lookup.
+        existing = registry.async_get_device(identifiers=identifiers)
     device_info: dr.DeviceInfo = {
         "identifiers": identifiers,
         "name": "Mitsubishi centralised controller",
@@ -60,7 +67,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         device_info["model"] = "AE-200 / AE-50 / EW-50"
     if metadata is not None and metadata.version:
         device_info["sw_version"] = metadata.version
-    registry.async_get_or_create(config_entry_id=entry.entry_id, **device_info)
+    controller = registry.async_get_or_create(config_entry_id=entry.entry_id, **device_info)
+    coordinator.controller_device_id = controller.id
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

@@ -71,6 +71,7 @@ class AE200Climate(AE200Entity, ClimateEntity):
     """A single AE-200 indoor unit as an HA climate entity."""
 
     _attr_name = None  # use the device name
+    _attr_translation_key = "air_conditioner"
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = 0.5
     _attr_hvac_modes = [
@@ -97,6 +98,11 @@ class AE200Climate(AE200Entity, ClimateEntity):
     @property
     def current_temperature(self) -> float | None:
         return self.device.current_temperature if self.device else None
+
+    @property
+    def current_humidity(self) -> float | None:
+        """Expose the cached measurement without advertising humidity control."""
+        return self.device.current_humidity if self.device else None
 
     @property
     def target_temperature(self) -> float | None:

@@ -264,6 +264,33 @@
       "remote_lock": {
         "name": "Local remote lockout"
       }
+    },
+    "climate": {
+      "air_conditioner": {
+        "state_attributes": {
+          "fan_mode": {
+            "state": {
+              "auto": "Automatic",
+              "low": "Low",
+              "medium": "Medium",
+              "medium_1": "Medium-high",
+              "medium_2": "Medium-low",
+              "high": "High"
+            }
+          },
+          "swing_mode": {
+            "state": {
+              "fixed_horizontal": "Fixed: horizontal",
+              "mid_0": "Fixed: upper intermediate",
+              "mid_1": "Fixed: intermediate",
+              "mid_2": "Fixed: lower intermediate",
+              "fixed_vertical": "Fixed: vertical",
+              "auto": "Automatic",
+              "swing": "Swing"
+            }
+          }
+        }
+      }
     }
   }
 }

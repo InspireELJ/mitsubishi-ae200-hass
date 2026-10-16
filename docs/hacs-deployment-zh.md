@@ -1,6 +1,10 @@
 # 公司版本的 HACS 部署、更新与回退
 
-使用 `InspireELJ/mitsubishi-ae200-hass` 的自定义仓库和 GitHub Releases。当前已发布版本为 `0.2.1b7`，修复五类既有可选读取在开始后被取消时的缓存质量：保留旧 raw/成功时刻为 stale，冷缓存 unknown，记录安全 CancelledError 并传播取消，按完成时刻冷却且不重试。控制上下文仅标当前记录，不覆盖未尝试的旧记录或继续后续 GET。组轮询错误代码改为受限 ASCII token，read_errors 导出再过滤 type/code 并建立独立两层字典，额外 message/URL 等字段丢弃，调用者不能经返回值修改客户端错误缓存。无新 API、实体、请求、轮询节奏、控制或自动化；这些分支以合成离线测试验证，不声称真实泄漏、攻击或现场故障注入。b7 已完成正常运行的 HA 部署回归：集成与内置库版本相符，原实体标识、运行设置、本地权限及自动化保留，既有 Clock 动作与缓存保持原 schema/解释；没有注入现场取消、断线或故障，也未为测试启用默认禁用的命令传感器，取消、异常代码和副本隔离仍依据离线测试；b6 daylight 的实际 HA 动作已通过：11 项 raw 与缓存及协议样本一致，立即重复被冷却拒绝，缓存仅 invocation status 变为 cooldown，其余六项字段与采样时间保持；原实体、运行设置、限制及自动化保留，不推 DST 或调整 Clock。最低 HA Core 版本为 `2025.12.0`。本流程保留 ae200 domain、既有实体标识与自动化。
+本次发布目标为 `0.2.1b8`，仅使用 `InspireELJ/mitsubishi-ae200-hass` 的自定义仓库和 GitHub Releases。此版本兼容新旧 HA 设备注册表 API，保留父子层级、既有实体标识、关联及用户设置；优先使用按 config entry 限定的父设备查找和新父设备 ID 字段，旧版本保留官方旧接口。最低 HA Core 仍为 `2025.12.0`。原生英/简中风档与风向文案、图标和既有实体简中文案不改变 option 原值或自动化参数，最终控件布局与图标呈现由 HA/frontend 决定。
+
+湿度补齐 climate 的原生只读属性，并在正常缓存更新后来首次出现湿度字段时被动注册原有 UID 的传感器，不增加协调器轮询需求、采集请求或湿度控制。现有 18 个湿度实体原本就已注册，其零或空占位继续为 unknown；本次不把 unknown 改成测量值，也不能据此判断物理上没有传感器。现场正湿度、单位与硬件仍未新验证。Timer 仅有设计研究，没有 Timer 实体、action 或自动控制。离线全量为 3530 passed、2 Windows skips，Node 4 passed，Ruff、112 文件内存编译、库同步及独立审查通过；兼容边界依据官方固定 Core `2025.12.0` / `2026.10.1` 源码与 stub 测试，不代替两版本实机验收。`0.2.1b8` 的发布、HACS 安装和现场验收尚待完成。
+
+此前已发布的 `0.2.1b7` 修复五类既有可选读取在开始后被取消时的缓存质量：保留旧 raw/成功时刻为 stale，冷缓存 unknown，记录安全 CancelledError 并传播取消，按完成时刻冷却且不重试。控制上下文仅标当前记录，不覆盖未尝试的旧记录或继续后续 GET。组轮询错误代码改为受限 ASCII token，read_errors 导出再过滤 type/code 并建立独立两层字典，额外 message/URL 等字段丢弃，调用者不能经返回值修改客户端错误缓存。无新 API、实体、请求、轮询节奏、控制或自动化；这些分支以合成离线测试验证，不声称真实泄漏、攻击或现场故障注入。b7 已完成正常运行的 HA 部署回归：集成与内置库版本相符，原实体标识、运行设置、本地权限及自动化保留，既有 Clock 动作与缓存保持原 schema/解释；没有注入现场取消、断线或故障，也未为测试启用默认禁用的命令传感器，取消、异常代码和副本隔离仍依据离线测试；b6 daylight 的实际 HA 动作已通过：11 项 raw 与缓存及协议样本一致，立即重复被冷却拒绝，缓存仅 invocation status 变为 cooldown，其余六项字段与采样时间保持；原实体、运行设置、限制及自动化保留，不推 DST 或调整 Clock。最低 HA Core 版本为 `2025.12.0`。本流程保留 ae200 domain、既有实体标识与自动化。
 
 b5 的三个气候布尔诊断同时要求实体可用且 group quality 精确为 fresh。失败或 outcome_unknown 的最后命令可额外显示白名单错误类型及受限短代码；消息、URL、连接详情、未知类型和非法代码不展示，原命令状态枚举与读回规则保持。
 
@@ -13,8 +17,8 @@ b5 的三个气候布尔诊断同时要求实体可用且 group quality 精确�
 3. 等待公司仓库 PR 的 test、hassfest、hacs 检查通过。只在公司仓库操作。
 4. 将公司仓库的开发 PR 合并到公司 `main`。若 PR 仍是 Draft，先在 PR 页面选择 Ready for review，再合并。
 5. 版本号变更合并到公司 `main` 后会自动启动 **Publish HACS release**。需要手动补跑时，打开 Actions → **Publish HACS release** → **Run workflow**，选择 `main`，运行。
-6. 工作流会重跑 CI；全部通过后校验版本一致性和归档校验和，创建 `v0.2.1b7` 标签及 Pre-release，并附上手动安装 ZIP 和 SHA-256。
-7. 在 Releases 确认 `v0.2.1b7` 已发布、标有 Pre-release，且目标是公司 `main` 的已测试提交。Draft release 不会提供给 HACS。
+6. 工作流会重跑 CI；全部通过后校验版本一致性和归档校验和，创建 `v0.2.1b8` 标签及 Pre-release，并附上手动安装 ZIP 和 SHA-256。
+7. 在 Releases 确认 `v0.2.1b8` 已发布、标有 Pre-release，且目标是公司 `main` 的已测试提交。Draft release 不会提供给 HACS。
 
 首次合并前，默认分支尚无这个工作流，因此 Actions 页面可能还没有 Run workflow 按钮。合并完成后再进入 Actions；首个版本正常情况下自动发布。
 
@@ -36,7 +40,7 @@ GitHub 托管的 Ubuntu runner 即可运行发布。工作流使用仓库内置 
 
    类型选择 **Integration**。
 
-4. 找到公司仓库，核对 Repository 链接中的 owner 是 `InspireELJ`。选择 Download。若版本选择器能直接显示 `v0.2.1b7`，选此版本；若 beta 尚未显示，首次可以选择公司 `main`，它在上述合并后应已包含同一 `0.2.1b7` 代码。下载完成前不要重启。
+4. 找到公司仓库，核对 Repository 链接中的 owner 是 `InspireELJ`。选择 Download。若版本选择器能直接显示 `v0.2.1b8`，选此版本；若 beta 尚未显示，首次可以选择公司 `main`，它在上述合并后应已包含同一 `0.2.1b8` 代码。下载完成前不要重启。
 5. 在现有 HA 终端运行 `ha core check`；没有 `ha` 命令的安装类型，使用其正常配置检查入口。通过后正常重启 HA。
 6. 核对已加载版本、原有实体标识、数量、房间分配、自动化目标及新增健康状态，并按[现场验收](deployment-zh.md#部署后的验收)下载诊断。`medium_1`、`medium_2` 分别保留控制器报告的 `MID1`、`MID2`；它们不是百分比，也不代表已发现每台室内机的全部可用风档。
 7. 继续执行下一节，为这个公司仓库开启 beta 更新并固定到 Release。
@@ -52,7 +56,7 @@ HACS 2.x 使用仓库对应的 **Pre-release** 开关控制 beta 更新。开关
 1. 首次公司版下载并重启后，进入 HA **设置 → 设备与服务 → 实体**。
 2. 按 Integration 筛选 **HACS**，显示禁用实体；找到这个 Mitsubishi 公司仓库对应的 **Pre-release** 开关。核对它属于公司仓库，启用实体并打开开关。
 3. 返回 HACS 的公司仓库菜单，选择 **Update information**。
-4. 若 HA **设置 → 更新** 中已有公司集成的更新卡，先核对 Installed 与 Latest 明确显示的版本，再使用 **Update**。也可选择 **Redownload → Need a different version? → v0.2.1b7 → Download**。部分前端提供 Show beta versions 入口；最终以明确显示的目标 Release 标签为准。
+4. 若 HA **设置 → 更新** 中已有公司集成的更新卡，先核对 Installed 与 Latest 明确显示的版本，再使用 **Update**。也可选择 **Redownload → Need a different version? → v0.2.1b8 → Download**。部分前端提供 Show beta versions 入口；最终以明确显示的目标 Release 标签为准。
 5. 下载后正常重启 HA，并核对版本。首次如果使用了 `main`，这一步让 HACS 记录为明确的已发布版本。
 
 更新信息只刷新版本元数据；Download/Redownload 才会替换代码。更新后的正常重启仍然需要完成。
@@ -65,7 +69,7 @@ HACS 2.x 使用仓库对应的 **Pre-release** 开关控制 beta 更新。开关
 
 开发分支修改并提高版本号 → 同步 bundled library → CI 通过 → 合并公司 `main` → 自动运行 Publish HACS release → HA 的公司 HACS 更新实体提示新版本 → 下载 → 正常重启 → 现场验收。
 
-每次发布都提高版本，例如 `0.2.1b6` → `0.2.1b7`，同步修改 HA manifest、`pymelans/pyproject.toml` 和 canonical `const.py`，运行库同步脚本，并补充对应 Changelog。发布脚本会拒绝版本不一致、缺少说明或改变 domain 的包。已经发布的标签和资产保持不变；修复通过新版本发布。
+每次发布都提高版本，例如 `0.2.1b7` → `0.2.1b8`，同步修改 HA manifest、`pymelans/pyproject.toml` 和 canonical `const.py`，运行库同步脚本，并补充对应 Changelog。发布脚本会拒绝版本不一致、缺少说明或改变 domain 的包。已经发布的标签和资产保持不变；修复通过新版本发布。
 
 Beta 阶段采用人工安装更新。稳定版本发布后，可以关闭仓库的 Pre-release 开关，仅接收正式版本。
 
