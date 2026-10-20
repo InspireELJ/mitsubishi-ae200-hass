@@ -174,6 +174,7 @@ def cached_snapshot(client: MelansClient) -> dict[str, Any]:
         "read_errors": _cached_read_errors(client),
         "capability_error": client.capability_error,
         "last_command": _redact(client.last_command),
+        "command_history": client.command_history_snapshot(),
         "control_context": client.control_context_snapshot(),
         "today_schedules": client.today_schedule_snapshot(),
         "weekly_patterns": client.weekly_pattern_snapshot(),
