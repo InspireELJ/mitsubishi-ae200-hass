@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- Retain up to 32 in-memory write-stage command attempts in cached diagnostics,
+  with allowlisted intent, safe errors and detached exports. Existing command
+  control and latest-command behaviour are unchanged.
+- Include neutral local brand icons and their editable MIT-licensed sources.
+- Document a staged timer proposal as design only; no timer service, scheduler
+  or automatic control has been implemented.
+
 ## [0.2.1b8] - 2026-10-16
 
 ### Fixed

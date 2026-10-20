@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <title>Indoor air conditioning unit with airflow</title>
+  <desc>Original neutral HVAC integration icon. Released under the MIT licence in LICENSE.</desc>
+  <rect x="24" y="40" width="208" height="92" rx="18" fill="#EAF5F7" stroke="#204454" stroke-width="10"/>
+  <path d="M52 70H204" stroke="#204454" stroke-width="8" stroke-linecap="round"/>
+  <rect x="46" y="94" width="164" height="16" rx="8" fill="#204454"/>
+  <g stroke="#168398" stroke-width="10" stroke-linecap="round">
+    <path d="M76 151C55 171 97 184 76 207"/>
+    <path d="M128 151C107 171 149 184 128 207"/>
+    <path d="M180 151C159 171 201 184 180 207"/>
+  </g>
+</svg>

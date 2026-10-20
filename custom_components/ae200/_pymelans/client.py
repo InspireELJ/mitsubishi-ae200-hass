@@ -6,8 +6,9 @@ import asyncio
 import math
 import re
 import time
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from collections.abc import Callable, Mapping
+from copy import deepcopy
 from datetime import UTC, datetime
 from typing import Any, TypeVar
 
@@ -134,6 +135,8 @@ class MelansClient:
         self.last_attempt: datetime | None = None
         self.last_success: datetime | None = None
         self.last_command: dict[str, object] | None = None
+        self._command_sequence = 0
+        self._command_history: deque[dict[str, Any]] = deque(maxlen=32)
         self._pending_writes: dict[str, dict[str, str]] = {}
         self._group_write_ack_at: dict[str, float] = {}
         self._readback_requested = False
@@ -1099,6 +1102,43 @@ class MelansClient:
         async with self._write_lock:
             await self._write_locked(group_id, attributes)
 
+    @staticmethod
+    def _command_intent(attributes: dict[str, str]) -> dict[str, str]:
+        """Keep bounded known settings, never arbitrary legacy write fields."""
+        values = {
+            "Drive": (const.DRIVE_ON, const.DRIVE_OFF),
+            "Mode": const.ALL_MODES,
+            "FanSpeed": const.ALL_FAN_SPEEDS,
+            "AirDirection": const.AIR_DIR_VALUES,
+            "RemoCon": (const.REMOCON_PERMIT, const.REMOCON_PROHIBIT),
+            "DriveItem": ("CHK_ON", "CHK_OFF"),
+            "ModeItem": ("CHK_ON", "CHK_OFF"),
+            "SetTempItem": ("CHK_ON", "CHK_OFF"),
+            "FilterItem": ("CHK_ON", "CHK_OFF"),
+        }
+        intent = {
+            key: attributes[key] for key, options in values.items()
+            if isinstance(attributes.get(key), str) and attributes[key] in options
+        }
+        temperature = attributes.get("SetTemp")
+        if isinstance(temperature, str) and len(temperature) <= 32:
+            try:
+                number = float(temperature)
+            except ValueError:
+                pass
+            else:
+                if math.isfinite(number):
+                    intent["SetTemp"] = temperature
+        return intent
+
+    def command_history_snapshot(self) -> list[dict[str, Any]]:
+        """Copy at most 32 write-stage attempts, not a transmission or ACK ledger.
+
+        Attempts start at the existing pending-command boundary. They can still
+        wait for I/O pacing, and later readback does not revise their outcome.
+        """
+        return deepcopy(list(self._command_history))
+
     async def _write_locked(self, group_id: str, attributes: dict[str, str]) -> None:
         """Write with the caller already holding the shared non-reentrant lock."""
         payload = protocol.build_set_request(group_id, attributes)
@@ -1111,6 +1151,16 @@ class MelansClient:
             "at": datetime.now(UTC).isoformat(),
             "status": "pending",
         }
+        self._command_sequence += 1
+        attempt = {
+            "sequence": self._command_sequence,
+            "group_id": group_id,
+            "at": self.last_command["at"],
+            "intent": self._command_intent(attributes),
+            "outcome": "pending",
+            "error": None,
+        }
+        self._command_history.append(attempt)
         response = None
         try:
             try:
@@ -1128,6 +1178,8 @@ class MelansClient:
             self.last_command["status"] = "outcome_unknown"
             self.last_command["error_type"] = "CancelledError"
             self.last_command["error_code"] = None
+            attempt["outcome"] = "outcome_unknown"
+            attempt["error"] = {"type": "CancelledError", "code": None}
             self._pending_writes.pop(group_id, None)
             self._readback_requested = True
             raise
@@ -1136,6 +1188,15 @@ class MelansClient:
             self.last_command["status"] = "outcome_unknown" if uncertain else "failed"
             self.last_command["error_type"] = type(err).__name__
             self.last_command["error_code"] = self._optional_read_error(err)["code"]
+            attempt["outcome"] = self.last_command["status"]
+            error_type = type(err).__name__
+            attempt["error"] = {
+                "type": error_type if error_type in (
+                    "MelansError", "MelansConnectionError", "MelansProtocolError",
+                    "MelansCommandUncertainError",
+                ) else None,
+                "code": self._optional_read_error(err)["code"],
+            }
             if uncertain:
                 # Sending may have succeeded. Observe without inventing an ACK.
                 self._pending_writes.pop(group_id, None)
@@ -1145,6 +1206,7 @@ class MelansClient:
             self._last_write = time.monotonic()
         self._group_write_ack_at[group_id] = time.perf_counter()
         self.last_command["status"] = "accepted_unconfirmed"
+        attempt["outcome"] = "accepted_unconfirmed"
         self._pending_writes.setdefault(group_id, {}).update(attributes)
         self._readback_requested = True
 
